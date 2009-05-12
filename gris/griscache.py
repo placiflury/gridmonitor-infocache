@@ -4,18 +4,17 @@ The Cache class is used to cache the
 information from the grid information system. The class
 provides methods to populate and access the cache.
 
-XXX: collect statistics and store them in cache
 
 """
 __author__="Placi Flury placi.flury@switch.ch"
-__date__="14.4.2009"
-__version__="0.1.0"
+__date__="12.5.2009"
+__version__="0.1.1"
 
 import shelve,logging, os.path
 from os import rename
 from errors.cache import *
 from errors.stats import *
-from cache import Cache
+from gridmonitor.model.cache.api.cache import Cache
 from gris import *
 from statistics import *
 
