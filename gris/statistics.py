@@ -2,8 +2,10 @@
 Container for statistical information about the grid compoenents.
 """
 __author__="Placi Flury placi.flury@switch.ch"
-__date__="20.4.2009"
-__version__="0.1.0"
+__date__="13.10.2009"
+__version__="0.1.2"
+
+# last change: added totalcpus to cluster attributes (CSTATS_ATTRS)
 
 import logging
 from gridmonitor.model.api.stats_api import StatsApi
@@ -11,8 +13,12 @@ from errors.stats import *
 
 class NGStats(StatsApi):
 
-    STATS_ATTRS=['cpus','gridrunning','gridqueued','localqueued',\
-                'prelrmsqueued','running']
+    QSTATS_ATTRS=['cpus','gridrunning','gridqueued','localqueued',\
+                'prelrmsqueued','running'] # queue attributes
+    CSTATS_ATTRS=['totaljobs','usedcpus','totalcpus']  # cluster attributes. Notice queue stats will be summed
+                                                       # up to cluster stats
+
+    STATS_ATTRS = QSTATS_ATTRS + CSTATS_ATTRS
 
     def __init__(self,name, type):
         self.log = logging.getLogger(__name__)
@@ -37,7 +43,7 @@ class NGStats(StatsApi):
                 assignment = ("self.%s=%s" % (attr_name,attr_value))
             exec(assignment)
         else: # just ignore assigment
-            self.log.warn("Assigment to unknown object attribe ('%s')" %(attr_name))
+            self.log.warn("Assigment to unknown object attribute ('%s')" %(attr_name))
             
     def add_child(self,child):
         # XXX adding a check if child has correct type 

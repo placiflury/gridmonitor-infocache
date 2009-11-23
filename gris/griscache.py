@@ -6,9 +6,12 @@ provides methods to populate and access the cache.
 
 
 """
+from __future__ import with_statement
+
 __author__="Placi Flury placi.flury@switch.ch"
-__date__="12.5.2009"
-__version__="0.1.1"
+__date__="13.11.2009"
+__version__="0.1.4"
+# last change: implementation of threading for ldap requests
 
 import shelve,logging, os.path
 from os import rename
@@ -18,12 +21,33 @@ from gridmonitor.model.cache.api.cache import Cache
 from gris import *
 from statistics import *
 
+import time, threading, Queue
+
+
 class GrisCache(Cache):
+    
+    THREAD_LIMIT= 10   # number of GRIS'es that will be queried in parallel
 
     def __init__(self,dbfile,infosys):
         self.log = logging.getLogger(__name__)
-        self.gris_list = infosys
+        self.gris_q = Queue.Queue(0) # no limit to queue
+        for gris in infosys:
+            self.gris_q.put(gris)
         self.dbfile = dbfile 
+        self.t_lock = threading.Lock()
+        # gris-specific stuff 
+        self.blacklist = None
+        self.whitelist = None
+        self.giis_proctime = -1
+    
+    def set_blacklist(self,blacklist):
+        self.blacklist = blacklist
+
+    def set_giis_proctime(self,proctime):
+        self.giis_proctime = proctime
+    
+    def set_whitelist(self,whitelist):
+        self.whitelist= whitelist
     
     def create(self):
         """ Creates a new and empty shelve database that is used
@@ -40,29 +64,26 @@ class GrisCache(Cache):
             
     def populate(self):
         """ Populates cache with information that gets directly
-            queries from the information system. 
+            queried from the information system. 
         """
         try:
             self._populate_clusterinfo()
             self._populate_userinfo()
             self._populate_statistics()
+            self._populate_grisspecific()
         except Exception, e:
             self.log.error("While populating cache got '%r'" % e)
             raise CREATE_ERROR("Populating cache failed", "Could not populate cache, got error %r" % e)
 
-    def _populate_clusterinfo(self):
-        clusters = dict()
-        cluster_queues = dict()
-        cluster_jobs = dict()
-        cluster_allowed_users = dict() 
-        
-        # some init values
-        self.dbase['cluster_queues'] =cluster_queues
-        self.dbase['cluster_jobs'] = cluster_jobs        
-        self.dbase['cluster_allowed_users'] = cluster_allowed_users        
-       
-        for gris, port in self.gris_list:
+
+    def __fetch_clusterinfo(self):
+        while True:
             try:
+                gris, port = self.gris_q.get(False) # non-blocking
+            except Queue.Empty:
+                break 
+            try:
+                timestamp = time.time()
                 ng = NGCluster(gris,port)
             except:
                 continue
@@ -85,20 +106,41 @@ class GrisCache(Cache):
                         duplicates_list.append(u)
                         allowed_user_list.append(u)
                 q.pickle_init()
-
-            cluster_queues[cluster_name] = queues_dict
-            cluster_jobs[cluster_name] = jobs_list
-            cluster_allowed_users[cluster_name] = allowed_user_list
- 
             ng.pickle_init()
-            clusters[cluster_name]=ng
 
-            self.dbase['cluster_queues'] =cluster_queues
-            self.dbase['cluster_jobs'] = cluster_jobs        
-            self.dbase['cluster_allowed_users'] = cluster_allowed_users        
+            with self.t_lock:    
+                proc_time = time.time() - timestamp
+                self._cluster_queues[cluster_name] = queues_dict  
+                self._cluster_jobs[cluster_name] = jobs_list
+                self._cluster_allowed_users[cluster_name] = allowed_user_list
+                self._clusters[cluster_name]=ng 
+                if self.whitelist and self.whitelist.has_key(ng.gris_server):
+                    self.whitelist[ng.gris_server].append(proc_time)
+ 
+    def _populate_clusterinfo(self):
 
-        self.dbase['clusters'] = clusters
-      
+        # shared among threads...
+        self._clusters = dict()
+        self._cluster_queues = dict()
+        self._cluster_jobs = dict()
+        self._cluster_allowed_users = dict() 
+        
+        # some init values
+        self.dbase['cluster_queues'] =self._cluster_queues
+        self.dbase['cluster_jobs'] = self._cluster_jobs        
+        self.dbase['cluster_allowed_users'] = self._cluster_allowed_users        
+     
+        for n in xrange(GrisCache.THREAD_LIMIT):
+            t = threading.Thread(target=self.__fetch_clusterinfo)
+            t.start()
+            while threading.activeCount() > 1:
+                time.sleep(2)
+
+        self.dbase['cluster_queues'] =self._cluster_queues
+        self.dbase['cluster_jobs'] = self._cluster_jobs        
+        self.dbase['cluster_allowed_users'] = self._cluster_allowed_users        
+        self.dbase['clusters'] = self._clusters 
+   
    
     def _populate_userinfo(self):
         user_jobs = dict()
@@ -110,6 +152,10 @@ class GrisCache(Cache):
 
             for j in cluster_jobs:
                 owner = j.get_globalowner()
+                # make sure 'owner' is a real user ( user info might be disrupted)
+                if owner == None or owner == 'None':
+                    owner ="<user_info_disrupted>"                    
+
                 job_qname = j.get_queue_name()
                 status = j.get_status()
                 try:
@@ -128,20 +174,23 @@ class GrisCache(Cache):
                     self.log.info("Found orphaned job of user '%s' on cluster/queue: '%s/%s'" % \
                             (owner,j.get_cluster_name(),job_qname))
                     user_jobs[owner]['orphans'].append(j)    
-                    self.log.error("%s not in %r" % (owner, job_q.get_allowed_users()))
+                    self.log.debug("%s not in %r" % (owner, job_q.get_allowed_users()))
                 else:
                     if not user_jobs[owner].has_key(status):
                         user_jobs[owner][status] = list()
                     user_jobs[owner][status].append(j)
-                            
-                    if not user_cluster_queues.has_key(owner):
-                        user_cluster_queues[owner] = dict(cluster_name=list())
-                    if not user_cluster_queues[owner].has_key(cluster_name):
-                        user_cluster_queues[owner][cluster_name] = list()
-                    user_cluster_queues[owner][cluster_name].append(job_q) 
-                
-        self.dbase['user_jobs'] = user_jobs
+             
+            # poplulate user_cluster_qeueus 'user_cluster_queues' - dict(user_dn= dict(cluster_name=[<queue_obj>,],...),...) 
+            for q in queues_dict.values():
+                for user in q.get_allowed_users():
+                    if not user_cluster_queues.has_key(user):
+                        user_cluster_queues[user] = dict({cluster_name:list()})
+                    if not user_cluster_queues[user].has_key(cluster_name):
+                        user_cluster_queues[user][cluster_name] = list()
+                    user_cluster_queues[user][cluster_name] = q 
+                    
         self.dbase['user_cluster_queues'] = user_cluster_queues
+        self.dbase['user_jobs'] = user_jobs
 
     
     def _populate_statistics(self):
@@ -154,10 +203,17 @@ class GrisCache(Cache):
         
         for cluster_name in self.dbase['cluster_queues'].keys():
             cstats = NGStats(cluster_name,'cluster')
+            # cluster statistics
+            cl = self.dbase['clusters'][cluster_name]
+            for attr_name in NGStats.CSTATS_ATTRS:
+                fct_sig ="cl.get_%s()" % attr_name
+                cstats.set_attribute(attr_name,eval(fct_sig))
+                gstats.set_attribute(attr_name,eval(fct_sig) + gstats.get_attribute(attr_name))
+            # collect queue statistics
             for qname in self.dbase['cluster_queues'][cluster_name].keys():
                 q = self.dbase['cluster_queues'][cluster_name][qname]
                 qstats = NGStats(q.get_name(),'queue') 
-                for attr_name in NGStats.STATS_ATTRS:
+                for attr_name in NGStats.QSTATS_ATTRS:
                     fct_sig = "q.get_%s()" % attr_name
                     qstats.set_attribute(attr_name,eval(fct_sig))
                     cstats.set_attribute(attr_name,eval(fct_sig) + cstats.get_attribute(attr_name))   
@@ -168,6 +224,11 @@ class GrisCache(Cache):
             gstats.add_child(cstats)
         gstats.pickle_init() 
         self.dbase['grid_stats'] = gstats             
+    
+    def _populate_grisspecific(self):
+        self.dbase['giis_proctime'] = self.giis_proctime
+        self.dbase['gris_blacklist'] = self.blacklist
+        self.dbase['gris_whitelist'] = self.whitelist
         
     def get_handle(self):
         if os.path.exists(self.dbfile) and os.path.isfile(self.dbfile):
@@ -187,6 +248,7 @@ class GrisCache(Cache):
             pass
 
     def close(self):
+        self.dbase['timestamp'] = time.ctime()
         self.dbase.close()
         self.log.debug("Removing lock of new cache...")
         rename(self.dbfile+".lock", self.dbfile)    

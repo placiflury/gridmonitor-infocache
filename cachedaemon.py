@@ -39,24 +39,24 @@ other information system flavor and types, while the type and flavor shall be sp
 either an entry in a config file or an invocation flag.
 """
 __author__="Placi Flury placi.flury@switch.ch"
-__date__="9.3.2009"
-__version__="0.1.0"
+__date__="4.8.2009"
+__version__="0.1.2"
+# last change -- reset of gris-list on each refresh
 
 from optparse import OptionParser
-import sys, os.path
+import sys, os.path, ldap
 import time
 import logging,logging.config
-
 from daemon import Daemon
 
-log = logging.getLogger(__name__)
 
 GRID_MONITOR_PATH = "/opt/GridMonitor"  # used to fetch APIs that need to be implemented
 
 if os.path.exists(GRID_MONITOR_PATH) and os.path.isdir(GRID_MONITOR_PATH):
-    log.info("Adding '%s' to PYTHONPATH in order to fetch GridMonitor API." % GRID_MONITOR_PATH)
+    pass
+    # print "Adding '%s' to PYTHONPATH in order to fetch GridMonitor API." % GRID_MONITOR_PATH
 else:
-    log.error("PYTHONPATH could not be set so if finds GridMonitor APIs.")
+    print "PYTHONPATH could not be set so it finds GridMonitor APIs."
 sys.path.append(GRID_MONITOR_PATH)
 
 from gris.giis import NGGiis 
@@ -64,12 +64,17 @@ from gris.griscache import GrisCache
 
 class GiisCacher(Daemon):
 
+    
+    BLACK_LIST_CYCL = 10    # number of cycles unreacheable gris'es get skipped before checked again
 
     def __init__(self, pidfile="/var/run/giiscacher.pid"):
-      
+        self.log = logging.getLogger(__name__)
         Daemon.__init__(self,pidfile)
         self.dbase = None
-        self.gris_list=[]
+        self.gris_list=list()
+        self.gris_blacklist=dict()
+        self.gris_protime = -1
+        self.gris_whitelist = dict()  # {ldap_server: [response_time]}
         self.__get_options()
 
     def __get_options(self):
@@ -78,7 +83,7 @@ class GiisCacher(Daemon):
         parser = OptionParser(usage=usage, version ="%prog " + __version__)
 
         parser.add_option("-g","--GIIS", action="store",
-                        dest="giis", type="string",
+                        dest="giis", type="string", default="giis.smscg.ch",
                         help="Comma-separated lisf of GIIS server(s).")
 
         parser.add_option("-s","--shelve_file", action="store",
@@ -93,11 +98,11 @@ class GiisCacher(Daemon):
         
         parser.add_option("-p","--periodicity", action="store",
                         dest="periodicity", type="int",
-                        default="30",
+                        default="60",
                         help="Queries GIIS every 'periodicity'[seconds].(default='%default')")
 
         (options,args) = parser.parse_args()
-        log.debug("Invocation with args: %r and options: %r" % (args,options))
+        self.log.debug("Invocation with args: %r and options: %r" % (args,options))
         
         self.options = options        
 
@@ -115,7 +120,7 @@ class GiisCacher(Daemon):
             sys.exit(0)
         
         self.giis_list = options.giis.split(',')
-        log.info("Using following GIIS'es: %r" % self.giis_list)
+        self.log.info("Using following GIIS'es: %r" % self.giis_list)
 
     def __del__(self):
         if self.dbase:
@@ -123,46 +128,89 @@ class GiisCacher(Daemon):
 
     def change_state(self):
         if self.command == 'start':
-            log.info("starting daemon...")
+            self.log.info("starting daemon...")
             daemon.start()
         elif self.command == 'stop':
-            log.info("stopping daemon...")
+            self.log.info("stopping daemon...")
             daemon.stop()
         elif self.command == 'restart':
-            log.info("restarting daemon...")
+            self.log.info("restarting daemon...")
             daemon.restart()
-   
-    
+
+    def is_gris_reacheable(self,host,port):
+        # quick and dirty check to see whether gris reacheable
+        # XXX timeout connection
+        host = host.strip()
+        if not host.startswith("ldap://"):
+            host = "ldap://" + host
+        port_suffix = ":" + str(port)
+        if not host.endswith(port_suffix):
+            host += port_suffix
+        try:
+            timestamp = time.time()
+            con = ldap.initialize(host)
+            con.simple_bind_s()
+            proc_time = time.time() - timestamp
+            con.unbind()
+            self.gris_whitelist[host] = [proc_time]
+            return True
+        except:
+            return False        
+
     def __refresh_gris_list(self):
+      
+        del(self.gris_list)
+        self.gris_list = list()
         for giis_server in self.giis_list:
             ng = None
             mds_vo_name = self.options.mds_vo_name
-            log.info("querying giis server:'%s'" % giis_server)
+            self.log.info("querying giis server:'%s'" % giis_server)
             try:
+                timestamp = time.time()
                 ng = NGGiis(giis_server, mds_vo_name=mds_vo_name)
                 ng_gris_list = ng.get_gris_list()
+                self.giis_proctime = time.time() - timestamp 
                 ng.close()
                 for gris in ng_gris_list:
                     if self.gris_list.count(gris) == 0: # avoid duplicates
-                        self.gris_list.append(gris)
+                        # check whether blacklisted
+                        if gris in self.gris_blacklist.keys():
+                            self.gris_blacklist[gris] -= 1   # decrease counter
+                            if self.gris_blacklist[gris] == 0:
+                                self.gris_blacklist.pop(gris)
+                        elif self.is_gris_reacheable(gris[0],gris[1]):
+                            self.gris_list.append(gris)
+                        else:
+                            self.log.info("blacklisting ('%s','%s') because not reacheable." % (gris[0],gris[1])) 
+                            self.gris_blacklist[gris] = GiisCacher.BLACK_LIST_CYCL
             except Exception, e:
                 # XXX exception handling, or at least better reporting
-                log.debug("got exception %r", e)
+                self.log.info("got exception %r", e)
     def run(self):
         
         while True:
+            timestamp = time.time()
             self.__refresh_gris_list() 
-            log.debug("gris-list %r" % self.gris_list)
+            self.log.debug("gris-list %r" % self.gris_list)
             db = GrisCache(self.options.shelve_file,self.gris_list)
+            if self.gris_blacklist:
+                db.set_blacklist(self.gris_blacklist)
+            db.set_giis_proctime(self.giis_proctime)
+            db.set_whitelist(self.gris_whitelist)
+            
             db.create()
             db.populate()
             db.close()
-            time.sleep(self.options.periodicity)
+            proc_time = time.time() - timestamp
+            if proc_time > self.options.periodicity:
+                continue
+            else:
+                time.sleep(self.options.periodicity - proc_time)
 
 
 if __name__ == "__main__":
-
-    logging.config.fileConfig("logging.conf")
+    
+    logging.config.fileConfig("/opt/ch.smscg.infocache/logging.conf")
     daemon = GiisCacher()
     daemon.change_state()
 

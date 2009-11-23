@@ -5,8 +5,10 @@ Class for querying the Nordugrid Information System GRIS.
 # Todo Check validity of ldap records (expiration time etc.)
 
 __author__="Placi Flury placi.flury@switch.ch"
-__date__="11.04.2009"
-__version__="0.2.1"
+__date__="12.10.2009"
+__version__="0.2.4"
+
+# last change -> added totlacpus info
 
 import ldap as LDAP
 import logging
@@ -25,7 +27,7 @@ class NGCluster(LDAPCommon,ClusterApi):
                     "nordugrid-cluster-runtimeenvironment","nordugrid-cluster-totaljobs",
                     "nordugrid-cluster-benchmark", "nordugrid-cluster-homogeneity",
                     "nordugrid-cluster-nodecpu", "nordugrid-cluster-opsys", 
-                    "nordugrid-cluster-usedcpus"]
+                    "nordugrid-cluster-usedcpus", "nordugrid-cluster-totalcpus"]
 
     PREFIX = "nordugrid-cluster-"
 
@@ -92,7 +94,7 @@ class NGCluster(LDAPCommon,ClusterApi):
     
         try:        
             res = self.ldap.search_s(base,scope,filter, NGCluster.CLUSTER_ATTRS)
-        except ldap.NO_SUCH_OBJECT:
+        except LDAP.NO_SUCH_OBJECT:
             self.log.error("GRIS query for server '%s' with (base=%s,scope=%s,filter=%s,attributes=%r) failed with: 'No such object'." %
             (self.gris_server,base,scope,filter,NGCluser.CLUSTER_ATTRS))
             
@@ -124,7 +126,7 @@ class NGCluster(LDAPCommon,ClusterApi):
         scope = LDAP.SCOPE_ONELEVEL
         try:
             res = self.ldap.search_s(base,scope,filter,NGQueue.QUEUE_ATTRS)
-        except ldap.NO_SUCH_OBJECT:
+        except LDAP.NO_SUCH_OBJECT:
             self.log.error("GRIS query for server '%s' with (base=%s,scope=%s,filter=%s,attributes=%r) failed with: 'No such object'." %
             (self.gris_server,base,scope,filter,NGQueue.QUEUE_ATTRS))
             
@@ -180,6 +182,25 @@ class NGCluster(LDAPCommon,ClusterApi):
     def get_alias(self):
         """ returns alias name  of cluster (frontend) """
         return self.get_attribute_first_value('aliasname')
+
+    def get_totaljobs(self):
+        val = self.get_attribute_first_value("totaljobs")
+        if val:
+            return int(val)
+        return 0
+
+    def get_usedcpus(self):
+        val = self.get_attribute_first_value("usedcpus")
+        if val:
+            return int(val)
+        return 0
+
+    def get_totalcpus(self):
+        val = self.get_attribute_first_value("totalcpus")
+        if val:
+            return int(val)
+        return 0
+
 
     def get_attribute_names(self):
         """ Getting all the attribute names defined for this cluster. """

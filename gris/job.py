@@ -24,7 +24,7 @@ class NGJob(JobApi):
              "nordugrid-job-submissiontime","nordugrid-job-completiontime",\
               "nordugrid-job-exitcode","nordugrid-job-proxyexpirationtime",\
               "nordugrid-job-usedcputime", "nordugrid-job-execcluster",\
-              "nordugrid-job-execqueue"]
+              "nordugrid-job-execqueue", "nordugrid-job-usedwalltime"]
 
 
     PREFIX = "nordugrid-job-"  
@@ -74,6 +74,13 @@ class NGJob(JobApi):
 
     def get_queue_name(self):
         return self.get_attribute_first_value("execqueue")
+
+    def get_usedwalltime(self):
+        t= self.get_attribute_first_value("usedwalltime")
+        if t:
+            return int(t)
+        else:  # XXX empiric... don't know why that happens 
+            return 0
 
     def get_attribute_first_value(self,name):
         items = self.get_attribute_values(name)
