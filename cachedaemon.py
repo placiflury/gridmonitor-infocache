@@ -66,6 +66,7 @@ class GiisCacher(Daemon):
 
     
     BLACK_LIST_CYCL = 10    # number of cycles unreacheable gris'es get skipped before checked again
+    NETWORK_TIMEOUT = 30    # ldap network timeout [seconds]
 
     def __init__(self, pidfile="/var/run/giiscacher.pid"):
         self.log = logging.getLogger(__name__)
@@ -138,8 +139,6 @@ class GiisCacher(Daemon):
             daemon.restart()
 
     def is_gris_reacheable(self,host,port):
-        # quick and dirty check to see whether gris reacheable
-        # XXX timeout connection
         host = host.strip()
         if not host.startswith("ldap://"):
             host = "ldap://" + host
@@ -149,6 +148,7 @@ class GiisCacher(Daemon):
         try:
             timestamp = time.time()
             con = ldap.initialize(host)
+            con.set_option(ldap.OPT_NETWORK_TIMEOUT,GiisCacher.NETWORK_TIMEOUT)
             con.simple_bind_s()
             proc_time = time.time() - timestamp
             con.unbind()
@@ -171,6 +171,7 @@ class GiisCacher(Daemon):
                 ng_gris_list = ng.get_gris_list()
                 self.giis_proctime = time.time() - timestamp 
                 ng.close()
+                #self.gris_list=[('nordugrid.unibe.ch','2135')]
                 for gris in ng_gris_list:
                     if self.gris_list.count(gris) == 0: # avoid duplicates
                         # check whether blacklisted
