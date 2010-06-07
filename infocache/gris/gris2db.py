@@ -17,14 +17,14 @@ from sqlalchemy import and_ as AND
 from sqlalchemy import or_ as OR
 from sqlalchemy import orm
 
-from errors.gris2db import *
-from errors.stats import *
 from gris import *
-import db.mon_meta as mon_meta
-import db.ng_schema as schema  
 from statistics import * 
 
-from voms.voms import * 
+from infocache.errors.gris import *
+from infocache.errors.stats import *
+from infocache.voms.voms import * 
+import infocache.db.mon_meta as mon_meta
+import infocache.db.ng_schema as schema  
 
 class Gris2db():
     

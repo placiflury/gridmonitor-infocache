@@ -10,8 +10,8 @@ __date__="10.04.2009"
 __version__="0.1.2"
 
 import ldap
-from utils.common import * 
-from errors.giis import * 
+from infocache.utils.common import * 
+from infocache.errors.giis import * 
 import logging, logging.config
 
 class NGGiis(LDAPCommon):

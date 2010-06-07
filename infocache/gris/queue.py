@@ -6,13 +6,13 @@ __author__="Placi Flury placi.flury@switch.ch"
 __date__="11.4.2009"
 __version__="0.2.0"
 
-from utils.common import LDAPSearchResult, LDAPCommon
-from user import NGUser 
-from job import NGJob
-from utils.utils import str_cannonize
 import ldap
 import logging
 
+from user import NGUser 
+from job import NGJob
+from infocache.utils.common import LDAPSearchResult, LDAPCommon
+from infocache.utils.utils import str_cannonize
 from gridmonitor.model.api.queue_api import QueueApi
 
 class NGQueue(LDAPCommon, QueueApi):

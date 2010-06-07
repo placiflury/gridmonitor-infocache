@@ -12,11 +12,10 @@ __version__="0.2.4"
 
 import ldap as LDAP
 import logging
-from utils.common import *
 from queue import NGQueue
+from infocache.errors.gris import * 
+from infocache.utils.common import *
 from gridmonitor.model.api.cluster_api import ClusterApi
-from errors.gris import * 
-
 
 class NGCluster(LDAPCommon,ClusterApi):
     """

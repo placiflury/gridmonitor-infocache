@@ -9,7 +9,7 @@ __version__="0.1.2"
 
 import logging
 from gridmonitor.model.api.stats_api import StatsApi
-from errors.stats import * 
+from infocache.errors.stats import * 
 
 class NGStats(StatsApi):
 

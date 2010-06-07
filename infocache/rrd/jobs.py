@@ -10,8 +10,8 @@ from sqlalchemy import and_ as AND
 from sqlalchemy import or_ as OR
 from sqlalchemy import orm
 
-import db.mon_meta as mon_meta
-import db.ng_schema as schema
+import infocache.db.mon_meta as mon_meta
+import infocache.db.ng_schema as schema
 import time, os.path, commands
 from datetime import datetime
 

@@ -6,8 +6,8 @@ __date__ = "16.04.2010"
 __version__ = "0.1.0"
 
 import logging, pickle
-import db.mon_meta as mon_meta
-import db.ng_schema as schema
+import infocache.db.mon_meta as mon_meta
+import infocache.db.ng_schema as schema
 
 import time, os.path, commands
 from sqlalchemy import orm

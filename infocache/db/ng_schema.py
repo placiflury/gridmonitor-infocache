@@ -14,10 +14,7 @@ __version__="1.0.0"
 import sqlalchemy as sa
 from sqlalchemy.orm import mapper,relation
 from datetime import datetime
-
-import db.mon_meta as mon_meta
-#import gridmonitor.model.giisdb.meta as mon_meta
-
+import mon_meta
 
 t_job = sa.Table("job",mon_meta.metadata,
         sa.Column("globalid",sa.types.VARCHAR(255),primary_key=True),

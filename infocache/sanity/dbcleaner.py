@@ -6,16 +6,15 @@ __date__="08.01.2010"
 __version__="0.1.0"
 
 import logging
+import time
+from datetime import datetime
 from sqlalchemy import and_ as AND
 from sqlalchemy import or_ as OR
 from sqlalchemy import orm
 
-import db.mon_meta as mon_meta
-import db.ng_schema as schema
-import time
-from datetime import datetime
-
-from rrd.jobs import Jobs
+import infocache.db.mon_meta as mon_meta
+import infocache.db.ng_schema as schema
+from infocache.rrd.jobs import Jobs
 
 
 

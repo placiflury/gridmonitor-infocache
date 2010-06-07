@@ -1,8 +1,8 @@
 # query voms server for 
 import logging, sys, os.path
 from os import environ
-from errors.voms import * 
-from utils.config_parser import config
+from infocache.voms.errors.voms import * 
+from infocache.utils.config_parser import config
 
 
 class VOMSConnector:

@@ -261,8 +261,8 @@ if __name__ == "__main__":
     
     #logging.config.fileConfig("config/logging.conf")
     logging.config.fileConfig("./config/logging.conf")
-    daemon = Giis2db(pidfile='/home/flury/giis2db.pid')
-    #daemon = Giis2db()
+    #daemon = Giis2db(pidfile='/home/flury/giis2db.pid')
+    daemon = Giis2db()
     daemon.change_state()
 
 
