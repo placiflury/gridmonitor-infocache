@@ -36,17 +36,17 @@ Notice: currently only supporting Nordugrid's GIIS/GRIS schema.
 todo: generalize so it supports also Glue schema(s)
 """
 __author__ = "Placi Flury placi.flury@switch.ch"
-__date__ = "10.12.2009"
-__version__ = "0.2.0"
+__date__ = "07.06.2010"
+__version__ = "0.2.1"
 
 from optparse import OptionParser
 import sys, os, os.path, ldap, time
 import logging, logging.config
 from daemon import Daemon
-import utils.config_parser as config_parser
 
-from init import init_model, init_config
-import db.mon_meta as mon_meta
+from db import init_model
+from utils import init_config
+import utils.config_parser as config_parser
 from sanity.dbcleaner import Cleanex
 from rrd.rrd import RRD
 
@@ -59,9 +59,9 @@ class Giis2db(Daemon):
 
     def __init__(self, pidfile="/var/run/giis2db.pid"):
         self.log = logging.getLogger(__name__)
-        Daemon.__init__(self,pidfile)
-        self.gris_list=list()
-        self.gris_blacklist=dict()
+        Daemon.__init__(self, pidfile)
+        self.gris_list = list()
+        self.gris_blacklist = dict()
         self.gris_whitelist = dict() 
         self.__get_options()
     
@@ -70,7 +70,7 @@ class Giis2db(Daemon):
             sys.path.append(self.gridmonitor_path)
         else:
             print "PYTHONPATH could not be set so it finds GridMonitor APIs."
-            self.log.errro("gridmonitor_path '%s' is not a file" % \
+            self.log.error("gridmonitor_path '%s' is not a file" % \
                 self.gridmonitor_path)
             sys.exit(-1)
             
@@ -79,22 +79,21 @@ class Giis2db(Daemon):
             self.log.info("Session object to local database created")
         except Exception, e:
             self.log.error("Session object to local database failed: %r", e)
-           
- 
+        
         self.log.debug("Initialization finished")
 
     def __get_options(self):
         usage = "usage: %prog [options] start|stop|restart \n\nDo %prog -h for more help."
 
-        parser = OptionParser(usage=usage, version ="%prog " + __version__)
+        parser = OptionParser(usage = usage, version = "%prog " + __version__)
         
-        parser.add_option("" ,"--config_file", action="store",
-            dest="config_file", type="string",
-            default="/opt/ch.smscg.infocache/config/config.ini",
-            help="File holding the smscg specific configuration for this site (default=%default)")
+        parser.add_option("" , "--config_file", action = "store",
+            dest = "config_file", type = "string",
+            default = "/opt/ch.smscg.infocache/config/config.ini",
+            help = "File holding the smscg specific configuration for this site (default=%default)")
 
-        (options,args) = parser.parse_args()
-        self.log.debug("Invocation with args: %r and options: %r" % (args,options))
+        (options, args) = parser.parse_args()
+        self.log.debug("Invocation with args: %r and options: %r" % (args, options))
         
         self.options = options        
 
@@ -102,7 +101,7 @@ class Giis2db(Daemon):
         if (not args):
             parser.error("Argument is missing.") 
         
-        if (args[0] not in ('start','stop','restart')):
+        if (args[0] not in ('start', 'stop', 'restart')):
             parser.error("Uknown argument")
         self.command = args[0]
 
@@ -173,7 +172,7 @@ class Giis2db(Daemon):
             daemon.restart()
             self.log.info("restarted")
 
-    def is_gris_reacheable(self,host,port):
+    def is_gris_reacheable(self, host, port):
         host = host.strip()
         if not host.startswith("ldap://"):
             host = "ldap://" + host
@@ -183,29 +182,29 @@ class Giis2db(Daemon):
         try:
             timestamp = time.time()
             con = ldap.initialize(host)
-            con.set_option(ldap.OPT_NETWORK_TIMEOUT,Giis2db.NETWORK_TIMEOUT)
-            con.set_option(ldap.OPT_TIMEOUT,Giis2db.LDAP_TIMEOUT)
+            con.set_option(ldap.OPT_NETWORK_TIMEOUT, Giis2db.NETWORK_TIMEOUT)
+            con.set_option(ldap.OPT_TIMEOUT, Giis2db.LDAP_TIMEOUT)
             con.simple_bind_s()
             con.unbind()
             gris = host.split(':')[1][2:]  # black-magic for getting hostname (dns)
             self.gris_whitelist[gris] = time.time() - timestamp  # response time
             return True
         except Exception, e:
-            self.log.debug("Can't reach %s: %r" % (host,e))
+            self.log.debug("Can't reach %s: %r" % (host, e))
             return False        
 
     def __refresh_gris_list(self):
         from gris.giis import NGGiis
         del(self.gris_list)
         self.gris_list = list()
-        self.giis_proctime= dict()
+        self.giis_proctime = dict()
         for giis_server in self.giis_list:
             ng = None
             mds_vo_name = self.mds_vo_name
             self.log.info("querying giis server:'%s'" % giis_server)
             try:
                 timestamp = time.time()
-                ng = NGGiis(giis_server, mds_vo_name=mds_vo_name)
+                ng = NGGiis(giis_server, mds_vo_name = mds_vo_name)
                 ng_gris_list = ng.get_gris_list()
                 self.giis_proctime[giis_server] = time.time() - timestamp 
                 ng.close()
@@ -215,10 +214,10 @@ class Giis2db(Daemon):
                             self.gris_blacklist[gris] -= 1   # decrease counter
                             if self.gris_blacklist[gris] == 0:
                                 self.gris_blacklist.pop(gris)
-                        elif self.is_gris_reacheable(gris[0],gris[1]):
+                        elif self.is_gris_reacheable(gris[0], gris[1]):
                             self.gris_list.append(gris)
                         else:
-                            self.log.info("blacklisting ('%s','%s') because not reacheable." % (gris[0],gris[1])) 
+                            self.log.info("blacklisting ('%s','%s') because not reacheable." % (gris[0], gris[1])) 
                             self.gris_blacklist[gris] = Giis2db.BLACK_LIST_CYCL
             except Exception, e:
                 # XXX exception handling, or at least better reporting
@@ -226,11 +225,11 @@ class Giis2db(Daemon):
     def run(self):
         from gris.gris2db import Gris2db
         db = Gris2db()
-        cleaner =Cleanex()
-        rrd = RRD(self.rrd_directory,self.plot_directory)
+        cleaner = Cleanex()
+        rrd = RRD(self.rrd_directory, self.plot_directory)
         while True:
             last_query_time = db.get_last_query_time() 
-            self.gris_whitelist=dict()
+            self.gris_whitelist = dict()
             timestamp = time.time()
             self.__refresh_gris_list() 
             db.refresh_gris_list(self.gris_list)
@@ -255,7 +254,6 @@ class Giis2db(Daemon):
                 continue
             else:
                 time.sleep(self.periodicity - proctime)
-
 
 if __name__ == "__main__":
     
