@@ -42,13 +42,15 @@ __version__ = "0.2.1"
 from optparse import OptionParser
 import sys, os, os.path, ldap, time
 import logging, logging.config
-from daemon import Daemon
+from infocache.daemon import Daemon
 
-from db import init_model
-from utils import init_config
-import utils.config_parser as config_parser
-from sanity.dbcleaner import Cleanex
-from rrd.rrd import RRD
+from infocache.db import init_model
+from infocache.utils import init_config
+import infocache.utils.config_parser as config_parser
+from infocache.sanity.dbcleaner import Cleanex
+from infocache.rrd.rrd import RRD
+from infocache.gris.giis import NGGiis
+from infocache.gris.gris2db import Gris2db
 
 
 class Giis2db(Daemon):
@@ -63,22 +65,23 @@ class Giis2db(Daemon):
         self.gris_list = list()
         self.gris_blacklist = dict()
         self.gris_whitelist = dict() 
+        self.options = None
+        self.mds_vo_name = None
+        self.rrd_directory = None
+        self.periodicity = None
+        self.database = None
+        self.giis_list = None
+        self.plot_directory = None
+        self.command = None
+        self.giis_proctime = None
+
         self.__get_options()
-    
-        if os.path.exists(self.gridmonitor_path) and \
-            os.path.isdir(self.gridmonitor_path):
-            sys.path.append(self.gridmonitor_path)
-        else:
-            print "PYTHONPATH could not be set so it finds GridMonitor APIs."
-            self.log.error("gridmonitor_path '%s' is not a file" % \
-                self.gridmonitor_path)
-            sys.exit(-1)
             
         try:
             init_model(self.database)
             self.log.info("Session object to local database created")
-        except Exception, e:
-            self.log.error("Session object to local database failed: %r", e)
+        except Exception, ex:
+            self.log.error("Session object to local database failed: %r", ex)
         
         self.log.debug("Initialization finished")
 
@@ -89,7 +92,7 @@ class Giis2db(Daemon):
         
         parser.add_option("" , "--config_file", action = "store",
             dest = "config_file", type = "string",
-            default = "/opt/ch.smscg.infocache/config/config.ini",
+            default = "/opt/smscg/infocache/etc/config.ini",
             help = "File holding the smscg specific configuration for this site (default=%default)")
 
         (options, args) = parser.parse_args()
@@ -129,7 +132,7 @@ class Giis2db(Daemon):
 
         self.giis_list = giis_raw.split(',')
         self.log.info("Using following GIIS'es: %r" % self.giis_list)
-    
+        
         periodicity = config_parser.config.get('periodicity')
         if not periodicity:
             self.log.info("No periodicity option defined in %s. Setting it to default (120 secs)"
@@ -142,11 +145,6 @@ class Giis2db(Daemon):
                 self.log.error("Could not set periodicity to '%s'. Please check option in %s"
                     % (periodicity,options.confif_file))
                 sys.exit(-1)
-        
-        self.gridmonitor_path = config_parser.config.get('gridmonitor_path')
-        if not self.gridmonitor_path:
-            self.log.error("'gridmonitor_path' option missing in %s." % (options.config_file))
-            sys.exit(-1)
        
         self.rrd_directory = config_parser.config.get('rrd_directory') 
         self.plot_directory = config_parser.config.get('plot_directory') 
@@ -159,6 +157,7 @@ class Giis2db(Daemon):
         pass
 
     def change_state(self):
+        """ Changing daemon state. """
         if self.command == 'start':
             self.log.info("starting daemon...")
             daemon.start()
@@ -173,6 +172,7 @@ class Giis2db(Daemon):
             self.log.info("restarted")
 
     def is_gris_reacheable(self, host, port):
+        """ Checking whether GRIS'es are up and reacheable. """
         host = host.strip()
         if not host.startswith("ldap://"):
             host = "ldap://" + host
@@ -194,7 +194,6 @@ class Giis2db(Daemon):
             return False        
 
     def __refresh_gris_list(self):
-        from gris.giis import NGGiis
         del(self.gris_list)
         self.gris_list = list()
         self.giis_proctime = dict()
@@ -223,10 +222,13 @@ class Giis2db(Daemon):
                 # XXX exception handling, or at least better reporting
                 self.log.info("got exception %r", e)
     def run(self):
-        from gris.gris2db import Gris2db
+        self.log.info("X1")
         db = Gris2db()
+        self.log.info("X2")
         cleaner = Cleanex()
+        self.log.info("X3")
         rrd = RRD(self.rrd_directory, self.plot_directory)
+        self.log.info("X4")
         while True:
             last_query_time = db.get_last_query_time() 
             self.gris_whitelist = dict()
@@ -258,8 +260,9 @@ class Giis2db(Daemon):
 if __name__ == "__main__":
     
     #logging.config.fileConfig("config/logging.conf")
-    logging.config.fileConfig("/opt/ch.smscg.infocache/config/logging.conf")
-    daemon = Giis2db()
+    logging.config.fileConfig("./config/logging.conf")
+    daemon = Giis2db(pidfile='/home/flury/giis2db.pid')
+    #daemon = Giis2db()
     daemon.change_state()
 
 

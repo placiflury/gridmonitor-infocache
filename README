@@ -1,1 +1,3 @@
-Mysql based caching of ldap queries
+ARC information system (currently GRIS) cacher. The information that gets
+queried is stored into a DB (mysql) and can be read by the GridMonitor.
+
