@@ -1,16 +1,15 @@
 """
 Nordugrid Information system modeling class 
 """
-# Todo Check validity of ldap records (expiration time etc.)
 
 __author__="Placi Flury placi.flury@switch.ch"
 __date__="11.4.2009"
-__version__="0.1.1"
+__version__="0.2.0"
 
-from common import LDAPSearchResult, LDAPCommon
+from utils.common import LDAPSearchResult, LDAPCommon
 from user import NGUser 
 from job import NGJob
-from utils import str_cannonize
+from utils.utils import str_cannonize
 import ldap
 import logging
 
@@ -24,7 +23,7 @@ class NGQueue(LDAPCommon, QueueApi):
     The class internally maps the QUEUE_ATTRS into object variables. For the 
     sake of notational simplicity the PREFIX part is omitted (if possible).
     """
-  
+
     QUEUE_ATTRS = ["Mds-validto","nordugrid-queue-name", \
                     "nordugrid-queue-status", \
                     "nordugrid-queue-running", \
@@ -55,7 +54,6 @@ class NGQueue(LDAPCommon, QueueApi):
         self.ldap_con = ldap_con        
         self.log = logging.getLogger(__name__)
 
-        # first read ldap attributes for queue
         for attr in NGQueue.QUEUE_ATTRS:
             var_name = attr.replace(NGQueue.PREFIX,'') # getting rid of prefix
             var_name = var_name.replace('-','_')  
@@ -67,25 +65,19 @@ class NGQueue(LDAPCommon, QueueApi):
                 assignment = "self.%s=[]" % var_name
                 self.log.debug("Assigning: %s=[]" % (var_name))
             exec(assignment) 
-
-        # set cannonical name of the queue
+        
         self.cname = str_cannonize(self.get_name())        
-        # populate user list
         self.refresh_users()
-        # populate job list
-        self.get_jobs()
     
     def pickle_init(self):
         if self.ldap_con:
             self.ldap_con = None # unbinding shall be done where binding took place
         del self.log        
         self.jobs = []
+        self.allowed_users =[]
+        
 
-    def reset_ldap_con(self,ldap_con):
-        """ Resetting ldap connection variable."""
-        self.ldap_con = ldap_con
-
-    def get_jobs(self):
+    def get_jobs(self,filter):
         """ LDAP gets querried every time, hence 'refresh_jobs'
             operation is intrinsic to this call.
         """
@@ -94,44 +86,45 @@ class NGQueue(LDAPCommon, QueueApi):
             nordugrid-cluster-name=%s,\
             Mds-Vo-name=local,o=grid"\
             % (self.get_name(), self.cluster_name)
-        
-        filter = "(objectClass=nordugrid-job)"
         scope = ldap.SCOPE_ONELEVEL
-        try:        
+
+        try:
             res = self.ldap_con.search_s(base,scope,filter,NGJob.JOB_ATTRS)
         except ldap.NO_SUCH_OBJECT:
-            self.log.error("GRIS query for server '%s' with (base=%s,scope=%s,filter=%s,attributes=%r) failed with: 'No such object'." %
-            (self.cluster_name,base,scope,filter,NGJob.JOB_ATTRS))
-
-            raise GRISError("GRIS No such object",
-                "GRIS query for server '%s' with (base=%s, scope=%s,filter=%s,attributes=%r)failed with: 'No such object'." %
-            (self.cluster_name,base,scope,filter,NGJob.JOB_ATTRS))
+            self.log.error( "GRIS query for server '%s' with (base=%s,scope=%s,filter=%s,attributes=%r) failed with: 'No such object'." 
+                        % (self.cluster_name,base,scope,filter,NGJob.JOB_ATTRS))
 
         records = LDAPCommon.format_res(self,res)
-        del self.jobs  # no caching of job records
-        self.jobs = []  
-        
+        jobs = []
+
         for rec in records:
-            self.jobs.append(NGJob(rec))
-    
-        return self.jobs    
+            jobs.append(NGJob(rec))
 
+        return jobs
 
-    def get_user_jobs(self,user_dn):
-        """
-        Getting jobs of a specific user.
-        param: user_dn -- DN of the user
-        """
-        all_jobs = self.get_jobs()
-        user_jobs = [] 
+    def get_job(self,job_id):
+            """ 
+            Query LDAP for job specified by job_id.
+            """
+            base = "nordugrid-info-group-name=jobs,\
+                nordugrid-queue-name=%s,\
+                nordugrid-cluster-name=%s,\
+                Mds-Vo-name=local,o=grid"\
+                % (self.get_name(), self.cluster_name)
 
-        for job in all_jobs:
-            if job.get_globalowner() != user_dn:
-                continue
-            user_jobs.append(job)
-        
-        return user_jobs
-            
+            filter = "(nordugrid-job-globalid=%s)" % job_id
+            scope = ldap.SCOPE_ONELEVEL
+            try:
+                res = self.ldap_con.search_s(base,scope,filter,NGJob.JOB_ATTRS)
+            except ldap.NO_SUCH_OBJECT:
+                self.log.error("GRIS query for server '%s' with (base=%s,scope=%s,filter=%s,attributes=%r) failed with: 'No such object'."
+                     % (self.cluster_name,base,scope,filter,NGJob.JOB_ATTRS))
+            records = LDAPCommon.format_res(self,res)
+
+            if records:
+                return NGJob(records[0])
+            return None
+
         
     def refresh_users(self):
         # fetch users that are allowed for this queue
@@ -167,14 +160,15 @@ class NGQueue(LDAPCommon, QueueApi):
         return self.allowed_users
 
 
-    def is_user_allowed(self, user_dn):
-        if user in self.allowed_users:
-            return True
-        return False
-
     def get_name(self):
         return self.get_attribute_first_value("name")
     
+    def get_cname(self):
+        return self.cname
+
+    def get_name(self):
+        return self.get_attribute_first_value("name")
+
     def get_cname(self):
         return self.cname
 
@@ -201,13 +195,13 @@ class NGQueue(LDAPCommon, QueueApi):
         if val:
             return int(val)
         return 0
-    
+
     def get_running(self):
         val = self.get_attribute_first_value("running")
         if val:
             return int(val)
         return 0
-    
+
     def get_prelrmsqueued(self):
         val = self.get_attribute_first_value("prelrmsqueued")
         if val:
@@ -215,9 +209,6 @@ class NGQueue(LDAPCommon, QueueApi):
         return 0
 
 
-
-
-    
     def get_attribute_first_value(self,name):
         items = self.get_attribute_values(name)
         if items:
@@ -242,7 +233,38 @@ class NGQueue(LDAPCommon, QueueApi):
             return eval("self."+name)
         return [] 
     
+    def set_maxsubtime_status_filter(self,**kwargs):
+        """ 
+        Specify a filter for getting jobs on specific cluster and queue.
+        
+        Args:
+        status  - job status (optional)
+        subtime - only take jobs submitted since subtime (optional). Time/date must
+                  be specified in ldap format i.e. %Y%m%d%H%M%SZ    
+        negation_of_status - if set to True, it negates the 'status' (requires status to be set)
+        """
 
+
+        if 'negation_of_status' in kwargs.keys() and 'status' in kwargs.keys() \
+            and kwargs['negation_of_status']:
+            prefix='(&(objectClass=nordugrid-job) \
+                    (nordugrid-job-submissiontime>=%s) \
+                 (!(nordugrid-job-status=%s)))'
+        else:
+            prefix='(&(objectClass=nordugrid-job) \
+                    (nordugrid-job-submissiontime>=%s) \
+                    (nordugrid-job-status=%s))'
+
+        if not 'subtime' in kwargs.keys():
+            prefix='(&(objectClass=nordugrid-job) (nordugrid-job-submissiontime=%s) (nordugrid-job-status=%s))'
+            subtime='*'
+        else:
+            subtime=kwargs['subtime']
+        if not 'status' in kwargs.keys():
+            status = '*'
+        else:
+            status=kwargs['status']
+        return  prefix % (subtime,status)
 
 
 

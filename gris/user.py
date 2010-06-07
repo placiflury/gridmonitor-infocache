@@ -18,7 +18,7 @@ class NGUser:
     sake of notational simplicity the PREFIX part is omitted (if possible).
     """
     
-    USER_ATTRS = ["nordugrid-authuser-sn","Mds-validto",\
+    USER_ATTRS = ["nordugrid-authuser-sn",
                 "nordugrid-authuser-queuelength" ] # number of queueing jobs user
 
 

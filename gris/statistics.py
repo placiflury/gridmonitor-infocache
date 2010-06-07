@@ -17,13 +17,15 @@ class NGStats(StatsApi):
                 'prelrmsqueued','running'] # queue attributes
     CSTATS_ATTRS=['totaljobs','usedcpus','totalcpus']  # cluster attributes. Notice queue stats will be summed
                                                        # up to cluster stats
+    SPECIAL_ATTRS=['vo_usage']   
 
-    STATS_ATTRS = QSTATS_ATTRS + CSTATS_ATTRS
+    STATS_ATTRS = QSTATS_ATTRS + CSTATS_ATTRS + SPECIAL_ATTRS
 
     def __init__(self,name, type):
         self.log = logging.getLogger(__name__)
         self.name = name        
         self.children = [] # list of subcomponents
+        
  
         if type not in StatsApi.VALID_TYPES:
             self.log.error("Invalid type '%s' for statistical container." % type)
@@ -34,6 +36,7 @@ class NGStats(StatsApi):
             exec(assignment)
     
     def set_attribute(self,attr_name,attr_value):
+
         if attr_name in NGStats.STATS_ATTRS:
             if type(attr_value) == int:
                 assignment = ("self.%s=%d" % (attr_name,attr_value))
@@ -63,7 +66,6 @@ class NGStats(StatsApi):
             as well NGStats objects.
         """
         return self.children
-
 
     def get_attribute_names(self):
         """ Getting all the attribute names defined for this container. """

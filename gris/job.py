@@ -20,11 +20,16 @@ class NGJob(JobApi):
     """
     
     JOB_ATTRS = ["nordugrid-job-jobname","nordugrid-job-globalid", \
-            "nordugrid-job-globalowner","nordugrid-job-status", "nordugrid-job-jobname",\
-             "nordugrid-job-submissiontime","nordugrid-job-completiontime",\
-              "nordugrid-job-exitcode","nordugrid-job-proxyexpirationtime",\
-              "nordugrid-job-usedcputime", "nordugrid-job-execcluster",\
-              "nordugrid-job-execqueue", "nordugrid-job-usedwalltime"]
+            "nordugrid-job-globalowner","nordugrid-job-status",\
+            "nordugrid-job-clientsoftware", "nordugrid-job-cpucount",\
+            "nordugrid-job-jobname", "nordugrid-job-executionnodes",\
+            "nordugrid-job-submissiontime","nordugrid-job-completiontime",\
+            "nordugrid-job-exitcode","nordugrid-job-proxyexpirationtime",\
+            "nordugrid-job-reqcputime","nordugrid-job-reqwalltime",\
+            "nordugrid-job-sessiondirerasetime", "nordugrid-job-stderr",\
+            "nordugrid-job-stdout", "nordugrid-job-usedcputime", \
+            "nordugrid-job-execcluster", "nordugrid-job-execqueue", \
+            "nordugrid-job-usedwalltime", "nordugrid-job-submissionui"]
 
 
     PREFIX = "nordugrid-job-"  

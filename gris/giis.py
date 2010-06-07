@@ -10,7 +10,7 @@ __date__="10.04.2009"
 __version__="0.1.2"
 
 import ldap
-from common import * 
+from utils.common import * 
 from errors.giis import * 
 import logging, logging.config
 

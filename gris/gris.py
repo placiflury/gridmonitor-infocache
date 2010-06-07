@@ -12,10 +12,11 @@ __version__="0.2.4"
 
 import ldap as LDAP
 import logging
-from common import *
+from utils.common import *
 from queue import NGQueue
 from gridmonitor.model.api.cluster_api import ClusterApi
 from errors.gris import * 
+
 
 class NGCluster(LDAPCommon,ClusterApi):
     """
@@ -30,6 +31,10 @@ class NGCluster(LDAPCommon,ClusterApi):
                     "nordugrid-cluster-usedcpus", "nordugrid-cluster-totalcpus"]
 
     PREFIX = "nordugrid-cluster-"
+
+    NETWORK_TIMEOUT =30    # ldap network timeout [seconds]
+    LDAP_TIMEOUT =60       # ldap timeout for any request [seconds]
+
 
     def __init__(self,host, port=2135):
         """
@@ -52,6 +57,8 @@ class NGCluster(LDAPCommon,ClusterApi):
 
         try:
             self.ldap = LDAP.initialize(host)    
+            self.ldap.set_option(LDAP.OPT_NETWORK_TIMEOUT,NGCluster.NETWORK_TIMEOUT)
+            self.ldap.set_option(LDAP.OPT_TIMEOUT,NGCluster.LDAP_TIMEOUT)
             self.ldap.simple_bind_s()
             self.log.debug("Connected to GRIS %s:" % (host))
         except LDAP.SERVER_DOWN:
