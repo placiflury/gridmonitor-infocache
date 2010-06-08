@@ -2,7 +2,7 @@
 import logging, sys, os.path
 from os import environ
 from infocache.voms.errors.voms import * 
-from infocache.utils.config_parser import config
+import infocache.utils.config_parser as config_parser
 
 
 class VOMSConnector:
@@ -19,7 +19,9 @@ class VOMSConnector:
         self.log = logging.getLogger(__name__)
         self.grid_security_path = None
         try:
-            self.voms_servers = config.get_voms_servers()
+            self.log.debug("Trying to fetch VOMS servers from GridMonitor configuration.")
+            self.voms_servers = config_parser.config.get_voms_servers()
+            self.log.debug("Got following voms servers: '%r'" % self.voms_servers)
         except GIIS2DBConfigError, ex:
             self.log.error("Configuration error: %s" % ex.message)
             raise VOMS_ENV_ERROR("Configuration Error","Configuration for accessing remote VOMS is faulty.")
@@ -45,14 +47,14 @@ class VOMSConnector:
         missing = {}
         self.log.debug("Checking environment...")
 
-        self.grid_security_path = config.get('grid_security_path')
+        self.grid_security_path = config_parser.config.get('grid_security_path')
         if not self.grid_security_path:
              self.grid_security_path = environ.get("GRID_SECURITY_PATH", "/etc/grid-security");
 
         if not os.path.exists(self.grid_security_path):
             missing["GRID_SECURITY_PATH"] = self.grid_security_path
 
-        self.glite_location = config.get('glite_location')
+        self.glite_location = config_parser.config.get('glite_location')
 
         if not self.glite_location:
             self.glite_location = environ.get("GLITE_LOCATION", "/opt/glite");
@@ -89,8 +91,8 @@ class VOMSConnector:
 
     def __setup_identity(self):
 
-        hostcert= config.get('usercert')
-        hostkey = config.get('userkey')
+        hostcert= config_parser.config.get('usercert')
+        hostkey = config_parser.config.get('userkey')
 
         user_id = os.geteuid()
 
