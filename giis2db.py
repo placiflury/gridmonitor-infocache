@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 ##############################################################################
 # Copyright (c) 2008, SMSCG - Swiss Multi Science Computing Grid.
 # All rights reserved.
@@ -256,9 +256,7 @@ class Giis2db(Daemon):
 
 if __name__ == "__main__":
     
-    #logging.config.fileConfig("config/logging.conf")
-    logging.config.fileConfig("./config/logging.conf")
-    #daemon = Giis2db(pidfile='/tmp/test/giis2db.pid')
+    logging.config.fileConfig("/opt/smscg/infocache/etc/logging.conf")
     daemon = Giis2db()
     daemon.change_state()
 
