@@ -5,14 +5,15 @@ the Nordugrid Information system.
 
 We assume that the Nordugrid Schema is in use. For the Glue 1.2 
 schema the tables might need to be adapted.
-
 """
+# last modification: migration to sqlachemy v. 0.6.x  
+
 __author__="Placi Flury grid@switch.ch"
-__date__="02.12.2009"
-__version__="1.0.0"
+__date__="10.06.2010"
+__version__="1.1.0"
 
 import sqlalchemy as sa
-from sqlalchemy.orm import mapper,relation
+from sqlalchemy.orm import mapper,relationship
 from datetime import datetime
 import mon_meta
 
@@ -169,19 +170,19 @@ class Giis(object):
 # job - cluster/queue (1:1), job.owner - cluster/queue, job.owner -> user_access (1:N)
 
 mapper(Job,t_job, 
-        properties=dict(access=relation(UserAccess,
+        properties=dict(access=relationship(UserAccess,
         foreign_keys=[t_job.c.globalowner],
         primaryjoin=(sa.and_(t_job.c.globalowner == t_user_access.c.user,
                     t_job.c.cluster_name == t_user_access.c.hostname,
                     t_job.c.queue_name == t_user_access.c.queuename))))
 )
 mapper(Cluster,t_cluster,
-        properties=dict(queues=relation(Queue, backref='cluster'))
+        properties=dict(queues=relationship(Queue, backref='cluster'))
 )
 mapper(Queue,t_queue)
 
 mapper(User,t_user, 
-        properties=dict(access = relation(UserAccess,
+        properties=dict(access = relationship(UserAccess,
         primaryjoin=(t_user.c.DN == t_user_access.c.user)))
 )
 mapper(UserAccess,t_user_access)

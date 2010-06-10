@@ -221,14 +221,11 @@ class Giis2db(Daemon):
             except Exception, e:
                 # XXX exception handling, or at least better reporting
                 self.log.info("got exception %r", e)
+
     def run(self):
-        self.log.info("X1")
         db = Gris2db()
-        self.log.info("X2")
         cleaner = Cleanex()
-        self.log.info("X3")
         rrd = RRD(self.rrd_directory, self.plot_directory)
-        self.log.info("X4")
         while True:
             last_query_time = db.get_last_query_time() 
             self.gris_whitelist = dict()
@@ -261,7 +258,7 @@ if __name__ == "__main__":
     
     #logging.config.fileConfig("config/logging.conf")
     logging.config.fileConfig("./config/logging.conf")
-    #daemon = Giis2db(pidfile='/home/flury/giis2db.pid')
+    #daemon = Giis2db(pidfile='/tmp/test/giis2db.pid')
     daemon = Giis2db()
     daemon.change_state()
 

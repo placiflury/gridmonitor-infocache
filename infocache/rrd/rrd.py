@@ -19,11 +19,13 @@ class RRD(object):
     def __init__(self, rrddir, plotdir):
         self.log = logging.getLogger(__name__)
         if os.path.exists(rrddir) and os.path.isdir(rrddir):
+            self.log.warn("RDD database dir %s does not exist" % rrddir)
             pass
         else: 
             rrddir = '/tmp'
         
         if os.path.exists(plotdir) and os.path.isdir(plotdir):
+            self.log.warn("RDD plot dir %s does not exist" % rrddir)
             pass
         else: 
             plotdir = '/tmp'

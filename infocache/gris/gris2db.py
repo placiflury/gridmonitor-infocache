@@ -73,7 +73,7 @@ class Gris2db():
             for cluster_name, port  in blacklist:
                 dbgris = schema.Grisblacklist()
                 dbgris.hostname = cluster_name
-                session.save(dbgris)
+                session.add(dbgris)
                 
                 self.log.debug("Deactivating cluster %s" % cluster_name)
                 query = session.query(schema.Cluster)
@@ -112,7 +112,7 @@ class Gris2db():
             dbgiis.hostname = hostname
             dbgiis.processing_time = t
             dbgiis.db_lastmodified = datetime.utcnow()
-            session.save(dbgiis)
+            session.add(dbgiis)
         session.flush()
         session.commit()
         session.close()
@@ -182,7 +182,7 @@ class Gris2db():
                         if not dbuser:
                             dbuser = schema.User()
                             dbuser.DN = dn
-                            session.save(dbuser)
+                            session.add(dbuser)
                         dbuser.db_lastmodified = datetime.utcnow()
                         session.flush()
                 
@@ -193,7 +193,7 @@ class Gris2db():
                             access_entry.hostname = cluster_name
                             access_entry.queuename= qname
                             access_entry.user = dn
-                            session.save(access_entry)
+                            session.add(access_entry)
                         access_entry.db_lastmodified=datetime.utcnow()
                         session.flush()
                         session.commit()
@@ -210,7 +210,7 @@ class Gris2db():
                     dbqueue = schema.Queue() 
                     dbqueue.name = qname
                     dbqueue.hostname = cluster_name
-                    session.save(dbqueue)
+                    session.add(dbqueue)
                     self.allowed_users_check = -1 # on next cycle allowed_users will be populated
                 dbqueue.status='active'
                 dbqueue.db_lastmodified=datetime.utcnow()
@@ -226,7 +226,7 @@ class Gris2db():
                 self.log.info("Cluster %s created in DB." % cluster_name)
                 dbcluster = schema.Cluster()
                 dbcluster.hostname = cluster_name 
-                session.save(dbcluster)
+                session.add(dbcluster)
                 self.allowed_users_check = -1 # on next cycle allowed_users will be populated
             dbcluster.alias = ng.get_alias()
             dbcluster.status = 'active'
@@ -263,7 +263,7 @@ class Gris2db():
             if not dbjob:
                 dbjob = schema.Job()
                 dbjob.globalid = id
-                session.save(dbjob)
+                session.add(dbjob)
 
             for attr in grisjob.get_attribute_names():
                 attr_values = grisjob.get_attribute_values(attr)
@@ -554,7 +554,7 @@ class Gris2db():
             if not dbgstats:
                 dbgstats = schema.GridStats()
                 dbgstats.gridname='SMSCG'
-                session.save(dbgstats)
+                session.add(dbgstats)
             dbgstats.pickle_object = pickle.dumps(gstats)
             dbgstats.db_lastmodified=datetime.utcnow()
             session.flush()

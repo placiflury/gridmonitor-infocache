@@ -129,8 +129,7 @@ class GrisGiis(object):
                 self.log.debug("UpdatedRDD database '%s'" % dbn)
 
             self.create_plots(cluster.hostname)
-
-        session.clear()
+        session.expunge_all()
 
     def giis(self):
         self.log.debug("Populating RDD with gris response and processing times.")

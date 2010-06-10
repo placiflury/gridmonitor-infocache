@@ -53,10 +53,8 @@ class Cleanex(object):
                 q.db_lastmodified = datetime.utcnow()
             for entry in session.query(schema.UserAccess).filter_by(hostname=cluster.hostname).all():
                 session.delete(entry)
-
         session.flush()
         session.commit()
-        session.clear()
     
     def check_queues(self):
         self.log.debug("Checking for expired queue records")
@@ -76,7 +74,6 @@ class Cleanex(object):
                 session.delete(entry)
         session.flush()
         session.commit()
-        session.clear()
 
     def check_users(self):
         pass
@@ -125,6 +122,5 @@ class Cleanex(object):
             session.flush()
             session.commit()
  
-        session.clear() 
 
 

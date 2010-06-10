@@ -13,6 +13,7 @@ __version__="0.1.0"
 import ConfigParser
 import sys
 import os.path
+import logging
 
 config = None
 
@@ -38,6 +39,7 @@ class ConfigReader:
         """ 
             config_file -- file with 'ini' style config settings
         """     
+        self.log = logging.getLogger(__name__)
         self.parser = ConfigParser.ConfigParser()
         if os.path.exists(config_file) and os.path.isfile(config_file):
             self.parser.read(config_file)
@@ -64,8 +66,8 @@ class ConfigReader:
 
         returns --  {<vo_name> : <vo_server>}
         """ 
-        
         gm_cfg = self.get('gridmonitor_configfile')
+        self.log.debug("Using following GridMonitor configuration file '%s' to get voms server" % gm_cfg)  
         parser2 = ConfigParser.ConfigParser()
         if os.path.exists(gm_cfg) and os.path.isfile(gm_cfg):
             parser2.read(gm_cfg)

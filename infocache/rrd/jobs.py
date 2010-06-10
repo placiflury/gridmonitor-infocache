@@ -167,8 +167,7 @@ class Jobs(object):
             self.log.debug("Updated RDD database '%s'" % dbn)
 
         self.create_plots()
-
-        session.clear()
+        session.expunge_all()
 
     
     def generate_plots(self):
