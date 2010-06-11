@@ -1,12 +1,5 @@
 recursive-include config
-recursive-include gris
-recursive-include db
-recursive-include errors
-recursive-include rrd 
-recursive-include sanity
-recursive-include utils
-recursive-include voms
-daemon.py
+recursive-include infocache
 giis2db.py
 setup.py
 setup.cfg
