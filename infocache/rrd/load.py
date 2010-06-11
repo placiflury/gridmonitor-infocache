@@ -6,7 +6,7 @@ __date__ = "16.04.2010"
 __version__ = "0.1.0"
 
 import logging, pickle
-import infocache.db.mon_meta as mon_meta
+import infocache.db.meta as meta
 import infocache.db.ng_schema as schema
 
 import time, os.path, commands
@@ -18,7 +18,7 @@ class GridLoad(object):
 
     def __init__(self, rrddir, plotdir):
         self.log = logging.getLogger(__name__)
-        self.Session = orm.scoped_session(mon_meta.Session)
+        self.Session = orm.scoped_session(meta.Session)
         """
         db = 'mysql://exp:lap3ns@localhost/experimental'
         engine = sa.create_engine(db)

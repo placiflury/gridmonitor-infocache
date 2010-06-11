@@ -12,14 +12,14 @@ from sqlalchemy import orm
 import time, os.path, commands
 from datetime import datetime
 
-import infocache.db.mon_meta as mon_meta
+import infocache.db.meta as meta
 import infocache.db.ng_schema as schema
 
 class GrisGiis(object):
 
     def __init__(self,rrddir, plotdir):
         self.log = logging.getLogger(__name__)
-        self.Session = orm.scoped_session(mon_meta.Session)
+        self.Session = orm.scoped_session(meta.Session)
         self.rrddir = rrddir
         self.plotdir = plotdir
         self.log.debug("Initialization finished")

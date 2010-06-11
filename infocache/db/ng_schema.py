@@ -15,9 +15,9 @@ __version__="1.1.0"
 import sqlalchemy as sa
 from sqlalchemy.orm import mapper,relationship
 from datetime import datetime
-import mon_meta
+import meta
 
-t_job = sa.Table("job",mon_meta.metadata,
+t_job = sa.Table("job",meta.metadata,
         sa.Column("globalid",sa.types.VARCHAR(255),primary_key=True),
         sa.Column("globalowner",sa.types.VARCHAR(255), nullable=False),
         sa.Column("status",sa.types.VARCHAR(32), nullable=False),
@@ -46,7 +46,7 @@ t_job = sa.Table("job",mon_meta.metadata,
 """
 status = [active,passive], tells whether queue can be accessed or not
 """
-t_queue = sa.Table("queue",mon_meta.metadata,
+t_queue = sa.Table("queue",meta.metadata,
         sa.Column('name',sa.types.VARCHAR(255),primary_key=True),
         sa.Column('hostname', None, sa.ForeignKey('cluster.hostname'),primary_key=True),
         sa.Column('pickle_object',sa.types.PickleType),
@@ -59,7 +59,7 @@ status = [active,passive], tells whether cluster still up or not
 response_time : infosys (GRIS)  response time
 processing_time: time it takes infosys (GRIS) to report on jobs etc.
 """
-t_cluster = sa.Table("cluster",mon_meta.metadata,
+t_cluster = sa.Table("cluster",meta.metadata,
         sa.Column('hostname',sa.types.VARCHAR(255), primary_key=True),
         sa.Column('alias',sa.types.VARCHAR(255)),
         sa.Column('pickle_object',sa.types.PickleType),
@@ -69,12 +69,12 @@ t_cluster = sa.Table("cluster",mon_meta.metadata,
         sa.Column("db_lastmodified",sa.types.DateTime, default=datetime.utcnow)
 )
 
-t_user = sa.Table("user",mon_meta.metadata,
+t_user = sa.Table("user",meta.metadata,
         sa.Column('DN', sa.types.VARCHAR(255),primary_key=True),
         sa.Column("db_lastmodified",sa.types.DateTime, default=datetime.utcnow)
 )
 
-t_user_access = sa.Table("user_access",mon_meta.metadata,
+t_user_access = sa.Table("user_access",meta.metadata,
         sa.Column('id',sa.types.Integer, primary_key=True, autoincrement=True),
         sa.Column('hostname', None, sa.ForeignKey('cluster.hostname')), 
         sa.Column('queuename', None, sa.ForeignKey('queue.name')),
@@ -82,19 +82,19 @@ t_user_access = sa.Table("user_access",mon_meta.metadata,
         sa.Column("db_lastmodified",sa.types.DateTime, default=datetime.utcnow)
 ) 
 
-t_gridstats = sa.Table("gridstats",mon_meta.metadata,
+t_gridstats = sa.Table("gridstats",meta.metadata,
         sa.Column('gridname',sa.types.VARCHAR(32),primary_key=True),
         sa.Column("pickle_object", sa.types.PickleType),
         sa.Column("db_lastmodified",sa.types.DateTime, default=datetime.utcnow)
 )
 
 
-t_grisblacklist = sa.Table('grisblacklist', mon_meta.metadata,
+t_grisblacklist = sa.Table('grisblacklist', meta.metadata,
         sa.Column('hostname', sa.types.VARCHAR(255),primary_key=True),
         sa.Column("db_lastmodified",sa.types.DateTime, default=datetime.utcnow)
 )
 
-t_giis = sa.Table('giis', mon_meta.metadata,
+t_giis = sa.Table('giis', meta.metadata,
         sa.Column('hostname', sa.types.VARCHAR(255),primary_key=True),
         sa.Column('processing_time',sa.types.FLOAT,default=-1.0),
         sa.Column("db_lastmodified",sa.types.DateTime, default=datetime.utcnow)

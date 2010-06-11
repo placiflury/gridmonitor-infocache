@@ -23,7 +23,7 @@ from statistics import *
 from infocache.errors.gris import *
 from infocache.errors.stats import *
 from infocache.voms.voms import * 
-import infocache.db.mon_meta as mon_meta
+import infocache.db.meta as meta
 import infocache.db.ng_schema as schema  
 
 class Gris2db():
@@ -44,7 +44,7 @@ class Gris2db():
         self.finished_jobs_check = Gris2db.FINISHED_CHECK_CYCLE  
         self.allowed_users_check = Gris2db.ALLOWED_USERS_CHECK_CYCLE  
         self.__populate_user_vo_map() # XXX call it every x hours
-        self.Session = orm.scoped_session(mon_meta.Session)
+        self.Session = orm.scoped_session(meta.Session)
         self.log.debug("Initialization finished")
 
     def refresh_gris_list(self, grislist):
