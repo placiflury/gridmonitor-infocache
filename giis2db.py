@@ -40,6 +40,7 @@ __date__ = "07.06.2010"
 __version__ = "0.2.1"
 
 from optparse import OptionParser
+from sqlalchemy import engine_from_config
 import sys, os, os.path, ldap, time
 import logging, logging.config
 from infocache.daemon import Daemon
@@ -69,7 +70,6 @@ class Giis2db(Daemon):
         self.mds_vo_name = None
         self.rrd_directory = None
         self.periodicity = None
-        self.database = None
         self.giis_list = None
         self.plot_directory = None
         self.command = None
@@ -78,7 +78,8 @@ class Giis2db(Daemon):
         self.__get_options()
             
         try:
-            init_model(self.database)
+            engine = engine_from_config(config_parser.config.get(),'sqlalchemy_infocache.')
+            init_model(engine)
             self.log.info("Session object to local database created")
         except Exception, ex:
             self.log.error("Session object to local database failed: %r", ex)
@@ -114,11 +115,8 @@ class Giis2db(Daemon):
         except Exception, e:
             self.log.error("While reading configuration %s got: %r" % (options.config_file, e))
             sys.exit(-1) 
+       
         # check whether mandatory settings of configuration are there 
-        self.database = config_parser.config.get('database')
-        if not self.database:
-            self.log.error("'database' option missing in %s." % (options.config_file))
-            sys.exit(-1)
         
         self.mds_vo_name = config_parser.config.get('mds_vo_name')
         if not self.mds_vo_name:
