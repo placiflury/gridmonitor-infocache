@@ -9,5 +9,5 @@ def init_model(engine):
     meta.engine = engine
     meta.metadata.bind = engine
     meta.metadata.create_all(checkfirst=True)
-    meta.Session = orm.sessionmaker(autoflush=True, autocommit=False, bind=engine)
-
+    sm = orm.sessionmaker(autoflush=True, autocommit=False, bind=engine)
+    meta.Session = orm.scoped_session(sm)

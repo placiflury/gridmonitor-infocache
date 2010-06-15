@@ -10,7 +10,6 @@ import infocache.db.meta as meta
 import infocache.db.ng_schema as schema
 
 import time, os.path, commands
-from sqlalchemy import orm
 import sqlalchemy as sa
 
 
@@ -18,7 +17,7 @@ class GridLoad(object):
 
     def __init__(self, rrddir, plotdir):
         self.log = logging.getLogger(__name__)
-        self.Session = orm.scoped_session(meta.Session)
+        self.Session = meta.Session
         """
         db = 'mysql://exp:lap3ns@localhost/experimental'
         engine = sa.create_engine(db)

@@ -10,7 +10,6 @@ import time
 from datetime import datetime
 from sqlalchemy import and_ as AND
 from sqlalchemy import or_ as OR
-from sqlalchemy import orm
 
 import infocache.db.meta as meta
 import infocache.db.ng_schema as schema
@@ -25,7 +24,7 @@ class Cleanex(object):
 
     def __init__(self):
         self.log = logging.getLogger(__name__)
-        self.Session = orm.scoped_session(meta.Session)
+        self.Session = meta.Session
         self.set_last_query_time(datetime.utcnow())
         self.log.debug("Initialization finished")
    

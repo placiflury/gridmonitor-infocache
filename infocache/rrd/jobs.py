@@ -8,7 +8,6 @@ __version__ = "0.1.0"
 import logging
 from sqlalchemy import and_ as AND
 from sqlalchemy import or_ as OR
-from sqlalchemy import orm
 
 import infocache.db.meta as meta
 import infocache.db.ng_schema as schema
@@ -38,7 +37,7 @@ class Jobs(object):
 
     def __init__(self, rrddir, plotdir):
         self.log = logging.getLogger(__name__)
-        self.Session = orm.scoped_session(meta.Session)
+        self.Session = meta.Session
         self.rrddir = rrddir
         self.plotdir = plotdir
         t_now = time.time()

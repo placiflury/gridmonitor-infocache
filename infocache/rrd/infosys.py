@@ -8,7 +8,6 @@ __version__="0.1.0"
 import logging
 from sqlalchemy import and_ as AND
 from sqlalchemy import or_ as OR
-from sqlalchemy import orm
 import time, os.path, commands
 from datetime import datetime
 
@@ -19,7 +18,7 @@ class GrisGiis(object):
 
     def __init__(self,rrddir, plotdir):
         self.log = logging.getLogger(__name__)
-        self.Session = orm.scoped_session(meta.Session)
+        self.Session = meta.Session
         self.rrddir = rrddir
         self.plotdir = plotdir
         self.log.debug("Initialization finished")

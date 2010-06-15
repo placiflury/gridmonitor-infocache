@@ -15,7 +15,6 @@ import time, threading, Queue
 from datetime import datetime
 from sqlalchemy import and_ as AND
 from sqlalchemy import or_ as OR
-from sqlalchemy import orm
 
 from gris import *
 from statistics import * 
@@ -44,7 +43,7 @@ class Gris2db():
         self.finished_jobs_check = Gris2db.FINISHED_CHECK_CYCLE  
         self.allowed_users_check = Gris2db.ALLOWED_USERS_CHECK_CYCLE  
         self.__populate_user_vo_map() # XXX call it every x hours
-        self.Session = orm.scoped_session(meta.Session)
+        self.Session = meta.Session
         self.log.debug("Initialization finished")
 
     def refresh_gris_list(self, grislist):
