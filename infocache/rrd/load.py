@@ -62,16 +62,17 @@ class GridLoad(object):
             cmd = "rrdtool graph %s -s %d -e %d --title='Actual queue backlogs on %s' \
                  DEF:ngqueued=%s:gridqueued:AVERAGE \
                  DEF:nlqueued=%s:localqueued:AVERAGE \
-                 DEF:npqueued=%s:prelrmsqueued:AVERAGE \
+                 DEF:npqueued_tmp=%s:prelrmsqueued:AVERAGE \
+                 CDEF:npqueued=npqueued_tmp,ngqueued,- \
                  VDEF:ngqueued_max=ngqueued,MAXIMUM \
                  VDEF:ngqueued_avg=ngqueued,AVERAGE \
                  VDEF:ngqueued_min=ngqueued,MINIMUM \
                  VDEF:nlqueued_max=nlqueued,MAXIMUM \
                  VDEF:nlqueued_avg=nlqueued,AVERAGE \
                  VDEF:nlqueued_min=nlqueued,MINIMUM \
-                 VDEF:npqueued_max=npqueued,MAXIMUM \
-                 VDEF:npqueued_avg=npqueued,AVERAGE \
-                 VDEF:npqueued_min=npqueued,MINIMUM \
+                 VDEF:npqueued_max=npqueued_tmp,MAXIMUM \
+                 VDEF:npqueued_avg=npqueued_tmp,AVERAGE \
+                 VDEF:npqueued_min=npqueued_tmp,MINIMUM \
                  -c BACK#F8F7FF \
                  -c CANVAS#4682B4 \
                  -c SHADEA#F0EDFF \
@@ -82,7 +83,7 @@ class GridLoad(object):
                  -c FONT#000000 \
                  -w 800 \
                  -o \
-                 -v \[number\] \
+                 -v \[jobs\] \
                  COMMENT:\"                  \"\
                  COMMENT:\"Minimum  \"\
                  COMMENT:\"Average  \"\
@@ -93,7 +94,7 @@ class GridLoad(object):
                  GPRINT:ngqueued_avg:\"     %%2.2lf\" \
                  GPRINT:ngqueued_max:\"      %%2.2lf\l\"\
                  COMMENT:\"    \"\
-                 AREA:npqueued#D9F38E:'PRELRMS QUEUED':STACK\
+                 AREA:npqueued#D9F38E:'PRELRMS QUEUED:STACK'\
                  GPRINT:npqueued_min:\"   %%2.2lf\" \
                  GPRINT:npqueued_avg:\"     %%2.2lf\" \
                  GPRINT:npqueued_max:\"      %%2.2lf\l\"\
@@ -108,7 +109,8 @@ class GridLoad(object):
                  DEF:ntotcpus=%s:totalcpus:AVERAGE \
                  DEF:nusedcpus=%s:usedcpus:AVERAGE \
                  DEF:ngrun=%s:gridrunning:AVERAGE \
-                 DEF:nrun=%s:running:AVERAGE \
+                 DEF:nrun_tmp=%s:running:AVERAGE \
+                 CDEF:nrun=nrun_tmp,ngrun,- \
                  VDEF:ntotcpus_max=ntotcpus,MAXIMUM \
                  VDEF:ntotcpus_avg=ntotcpus,AVERAGE \
                  VDEF:ntotcpus_min=ntotcpus,MINIMUM \
@@ -118,9 +120,9 @@ class GridLoad(object):
                  VDEF:ngrun_max=ngrun,MAXIMUM \
                  VDEF:ngrun_avg=ngrun,AVERAGE \
                  VDEF:ngrun_min=ngrun,MINIMUM \
-                 VDEF:nrun_max=nrun,MAXIMUM \
-                 VDEF:nrun_avg=nrun,AVERAGE \
-                 VDEF:nrun_min=nrun,MINIMUM \
+                 VDEF:nrun_max=nrun_tmp,MAXIMUM \
+                 VDEF:nrun_avg=nrun_tmp,AVERAGE \
+                 VDEF:nrun_min=nrun_tmp,MINIMUM \
                  -c BACK#F8F7FF \
                  -c CANVAS#4682B4 \
                  -c SHADEA#F0EDFF \
@@ -130,8 +132,8 @@ class GridLoad(object):
                  -c ARROW#000000 \
                  -c FONT#000000 \
                  -w 800 \
-                 -v \[number\] \
-                 LINE2:ntotcpus#CCFFFF:\"TOTAL CPUS \l\"\
+                 -v \['cores or jobs'\] \
+                 LINE2:ntotcpus#CCFFFF:\"TOTAL COREs \l\"\
                  COMMENT:\"                  \"\
                  COMMENT:\"Minimum  \"\
                  COMMENT:\"Average  \"\
@@ -147,7 +149,7 @@ class GridLoad(object):
                  GPRINT:nrun_avg:\"     %%2.2lf\" \
                  GPRINT:nrun_max:\"      %%2.2lf\l\"\
                  COMMENT:\"    \"\
-                 LINE2:nusedcpus#990000:'USED CPUS'\
+                 LINE2:nusedcpus#990000:'USED COREs'\
                  GPRINT:nusedcpus_min:\"    %%2.2lf\" \
                  GPRINT:nusedcpus_avg:\"     %%2.2lf\" \
                  GPRINT:nusedcpus_max:\"      %%2.2lf\l\"" % (fig_name, start, end, 
