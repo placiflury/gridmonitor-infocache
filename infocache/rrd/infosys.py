@@ -26,19 +26,19 @@ class GrisGiis(object):
     
     def create_rrd(self,dbname):
         """
-        RRA: 6 hours (120 * 180)   with 120 sec resolution
-        RRA: 1 week (120 * 30  * 168)  with 1 hour resolution
+        RRA: 24 hours (120 * 720)   with 120 sec resolution
+        RRA: 1 week (120 * 15  * 336)  with 30 min resolution
         RRA: 12 months (120 * 360 * 365 ) with 12 hours resolution
         """
         now = time.time() - 3600  # let's be on the save side
         cmd = "rrdtool create %s --step 120 --start %d\
          DS:response_time:GAUGE:240:0:U\
          DS:processing_time:GAUGE:240:0:U\
-         RRA:AVERAGE:0.5:1:180\
-         RRA:AVERAGE:0.5:30:168\
+         RRA:AVERAGE:0.5:1:720\
+         RRA:AVERAGE:0.5:15:336\
          RRA:AVERAGE:0.5:360:365\
-         RRA:MAX:0.5:1:180\
-         RRA:MAX:0.5:30:168:\
+         RRA:MAX:0.5:1:720\
+         RRA:MAX:0.5:15:336:\
          RRA:MAX:0.5:360:365" %  (dbname,now) 
 
         (code,output) = commands.getstatusoutput(cmd)
@@ -72,17 +72,17 @@ class GrisGiis(object):
 
     def create_plots(self,cluster_name, type='GRIS'):
         
-        rrd_file = os.path.join(self.rrddir,cluster_name+'.rrd')
-        fig6_name = os.path.join(self.plotdir,cluster_name+'_h6.png') # 6hours plot
-        h6_e = time.time()
-        h6_s = h6_e - 6 * 3600
+        rrd_file = os.path.join(self.rrddir, cluster_name+'.rrd')
+        fig24_name = os.path.join(self.plotdir, cluster_name+'_h24.png') # 24hours plot
+        h24_e = time.time()
+        h24_s = h24_e - 24 * 3600
 
-        cmd = self._make_cmd(fig6_name,h6_s,h6_e,cluster_name,type,rrd_file)
+        cmd = self._make_cmd(fig24_name,h24_s, h24_e,cluster_name, type, rrd_file)
         (code,output) = commands.getstatusoutput(cmd)
         if code !=0:
             self.log.error( output)
         
-        figw1_name = os.path.join(self.plotdir,cluster_name+'_w1.png') # 1 week  plot
+        figw1_name = os.path.join(self.plotdir, cluster_name+'_w1.png') # 1 week  plot
         hw1_e = time.time()
         hw1_s = hw1_e - 24 * 3600 * 7 
 

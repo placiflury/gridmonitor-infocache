@@ -33,8 +33,8 @@ class GridLoad(object):
     def create_rrd(self, dbname):
         """
         RRA: 24 hours (120 * 720)   with 120 sec resolution
-        RRA: 1 week (120 * 30  * 168)  with 1 hour resolution
-        RRA: 6 months (120 * 360 * 182 ) with 12 hours resolution
+        RRA: 1 week (120 * 15  * 336)  with 30 min resolution
+        RRA: 12 months (120 * 360 * 365 ) with 12 hours resolution
         """
         cmd = "rrdtool create %s --step 120 \
          DS:totalcpus:GAUGE:240:0:U\
@@ -45,11 +45,11 @@ class GridLoad(object):
          DS:localqueued:GAUGE:240:0:U\
          DS:prelrmsqueued:GAUGE:240:0:U\
          RRA:AVERAGE:0.5:1:720\
-         RRA:AVERAGE:0.5:30:168\
-         RRA:AVERAGE:0.5:360:182\
-         RRA:MAX:0.5:1:180\
-         RRA:MAX:0.5:30:168:\
-         RRA:MAX:0.5:360:182" %  (dbname) 
+         RRA:AVERAGE:0.5:15:336\
+         RRA:AVERAGE:0.5:360:365\
+         RRA:MAX:0.5:1:720\
+         RRA:MAX:0.5:15:336:\
+         RRA:MAX:0.5:360:365" %  (dbname) 
 
         (code, output) = commands.getstatusoutput(cmd)
         if code != 0:
@@ -190,17 +190,17 @@ class GridLoad(object):
         if code != 0:
             self.log.error( output)
         
-        hm6_e = time.time()
-        hm6_s = hm6_e - 24 * 3600 * 182
+        hm12_e = time.time()
+        hm12_s = hm12_e - 24 * 3600 * 365
         
-        figm6_name = os.path.join(self.plotdir, grid_cluster_queue_name+'stats_qm6.png') # 1/2 year  plot
-        cmd = self._make_cmd(figm6_name, hm6_s, hm6_e, rrd_file, 'queued',grid_cluster_queue_name)
+        figm12_name = os.path.join(self.plotdir, grid_cluster_queue_name+'stats_qy1.png') # 1year  plot
+        cmd = self._make_cmd(figm12_name, hm12_s, hm12_e, rrd_file, 'queued',grid_cluster_queue_name)
         (code, output) = commands.getstatusoutput(cmd)
         if code != 0:
             self.log.error( output)
 
-        figm6_name = os.path.join(self.plotdir, grid_cluster_queue_name+'stats_cm6.png') # 1/2 year  plot
-        cmd = self._make_cmd(figm6_name, hm6_s, hm6_e, rrd_file, 'cpu',grid_cluster_queue_name)
+        figm12_name = os.path.join(self.plotdir, grid_cluster_queue_name+'stats_cy1.png') # 1 year  plot
+        cmd = self._make_cmd(figm12_name, hm12_s, hm12_e, rrd_file, 'cpu',grid_cluster_queue_name)
         (code, output) = commands.getstatusoutput(cmd)
         if code != 0:
             self.log.error( output)

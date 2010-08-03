@@ -47,8 +47,8 @@ class Jobs(object):
     
     def create_rrd(self, dbname):
         """
-        RRA: 12 hours (120 * 360)   with 120 sec resolution
-        RRA: 1 week (120 * 30  * 168)  with 1 hour resolution
+        RRA: 24 hours (120 * 720)   with 120 sec resolution
+        RRA: 1 week (120 * 15  * 336)  with 30 min resolution
         RRA: 12 months (120 * 360 * 365 ) with 12 hours resolution
         """
         now = time.time() - Jobs.SAFETY_DELAY - 3600  # let's be on the save side
@@ -63,11 +63,11 @@ class Jobs(object):
          DS:deleted_walltime:GAUGE:240:0:U\
          DS:lost:GAUGE:240:0:U\
          DS:lost_walltime:GAUGE:240:0:U\
-         RRA:AVERAGE:0.5:1:360\
-         RRA:AVERAGE:0.5:30:168\
+         RRA:AVERAGE:0.5:1:720\
+         RRA:AVERAGE:0.5:15:336\
          RRA:AVERAGE:0.5:360:365\
-         RRA:MAX:0.5:1:360\
-         RRA:MAX:0.5:30:168:\
+         RRA:MAX:0.5:1:720\
+         RRA:MAX:0.5:15:336:\
          RRA:MAX:0.5:360:365" %  (dbname,now) 
 
         (code,output) = commands.getstatusoutput(cmd)
@@ -267,7 +267,7 @@ class Jobs(object):
                  -c ARROW#000000 \
                  -c FONT#000000 \
                  -w 800  \
-                 -v \[secs\] \
+                 -v \[min\] \
                  -o \
                  COMMENT:\"                  \"\
                  COMMENT:\"Minimum  \"\
@@ -304,17 +304,17 @@ class Jobs(object):
     def create_plots(self):
         
         rrd_file = os.path.join(self.rrddir,Jobs.FINAL_JOBS_RRD)
-        h12_e = time.time()
-        h12_s = h12_e - 12 * 3600
+        h24_e = time.time()
+        h24_s = h24_e - 24 * 3600
         
-        fig12_name = os.path.join(self.plotdir, Jobs.FINAL_JOBS_RRD[:-4]+'nj_h12.png') # 6hours plot
-        cmd = self._make_cmd(fig12_name, h12_s, h12_e, rrd_file)
+        fig24_name = os.path.join(self.plotdir, Jobs.FINAL_JOBS_RRD[:-4]+'nj_h24.png') # 24hours plot
+        cmd = self._make_cmd(fig24_name, h24_s, h24_e, rrd_file)
         (code,output) = commands.getstatusoutput(cmd)
         if code !=0:
             self.log.error( output)
         
-        fig12_name = os.path.join(self.plotdir,Jobs.FINAL_JOBS_RRD[:-4]+'wj_h12.png') # 6hours plot
-        cmd = self._make_cmd(fig12_name, h12_s, h12_e, rrd_file,type='walltime')
+        fig24_name = os.path.join(self.plotdir,Jobs.FINAL_JOBS_RRD[:-4]+'wj_h24.png') # 24hours plot
+        cmd = self._make_cmd(fig24_name, h24_s, h24_e, rrd_file,type='walltime')
         (code,output) = commands.getstatusoutput(cmd)
         if code !=0:
             self.log.error( output)
