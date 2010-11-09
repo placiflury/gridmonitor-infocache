@@ -20,6 +20,7 @@ from infocache.rrd.jobs import Jobs
 class Cleanex(object):
 
     FETCHED_RECORD_AGE = 3600 * 12  # max age of db records of jobs that got fetched
+    INACTIVE_CLUSTER_MAX_AGE= 3600 * 24 * 14 # max age of inactive cluster before removal (2 weeks)
 
 
     def __init__(self):
@@ -40,6 +41,23 @@ class Cleanex(object):
         session = self.Session()
         query = session.query(schema.Cluster)
         
+        # remove old inactive clusters
+        
+        inactive_since = datetime.utcfromtimestamp(time.time() - Cleanex.INACTIVE_CLUSTER_MAX_AGE)
+        inactive_clusters= query.filter(AND(schema.Cluster.db_lastmodified <= inactive_since,
+            schema.Cluster.status == 'inactive')).all()
+
+        for cluster in inactive_clusters:
+            self.log.info("Removing inactivate cluster '%s'" % cluster.hostname)
+            for q in session.query(schema.Queue).filter_by(hostname=cluster.hostname).all():
+                session.delete(q)
+            for entry in session.query(schema.UserAccess).filter_by(hostname=cluster.hostname).all():
+                session.delete(entry)
+            session.delete(cluster)
+            self.log.info("Cluster  '%s' and queues removed" % cluster.hostname)
+        session.flush()
+
+
         clusters= query.filter(AND(schema.Cluster.db_lastmodified <= self.last_query_time,
             schema.Cluster.status == 'active')).all()
         
@@ -54,6 +72,7 @@ class Cleanex(object):
                 session.delete(entry)
         session.flush()
         session.commit()
+        
     
     def check_queues(self):
         self.log.debug("Checking for expired queue records")
