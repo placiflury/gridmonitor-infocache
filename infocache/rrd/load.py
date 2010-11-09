@@ -18,13 +18,6 @@ class GridLoad(object):
     def __init__(self, rrddir, plotdir):
         self.log = logging.getLogger(__name__)
         self.Session = meta.Session
-        """
-        db = 'mysql://exp:lap3ns@localhost/experimental'
-        engine = sa.create_engine(db)
-        meta.metadata.bind = engine
-
-        self.Session = orm.sessionmaker(autoflush=False, transactional=False, bind=engine)
-        """
         self.rrddir = rrddir
         self.plotdir = plotdir
         self.log.debug("Initialization finished")
