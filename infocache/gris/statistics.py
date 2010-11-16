@@ -1,9 +1,9 @@
 """
 Container for statistical information about the grid compoenents.
 """
-__author__="Placi Flury placi.flury@switch.ch"
-__date__="13.10.2009"
-__version__="0.1.2"
+__author__="Placi Flury grid@switch.ch"
+__date__="09.11.2010"
+__version__="0.2.0"
 
 # last change: added totalcpus to cluster attributes (CSTATS_ATTRS)
 
@@ -17,9 +17,8 @@ class NGStats(StatsApi):
                 'prelrmsqueued','running'] # queue attributes
     CSTATS_ATTRS=['totaljobs','usedcpus','totalcpus']  # cluster attributes. Notice queue stats will be summed
                                                        # up to cluster stats
-    SPECIAL_ATTRS=['vo_usage']   
 
-    STATS_ATTRS = QSTATS_ATTRS + CSTATS_ATTRS + SPECIAL_ATTRS
+    STATS_ATTRS = QSTATS_ATTRS + CSTATS_ATTRS 
 
     def __init__(self,name, type):
         self.log = logging.getLogger(__name__)

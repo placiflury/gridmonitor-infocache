@@ -6,8 +6,8 @@ the giis2db daemon was started.
 """
 from __future__ import with_statement
 
-__author__ = "Placi Flury placi.flury@switch.ch"
-__date__ = "10.12.2009"
+__author__ = "Placi Flury grid@switch.ch"
+__date__ = "09.11.2010"
 __version__ = "0.2.0"
 
 import logging, pickle
@@ -21,13 +21,12 @@ from statistics import *
 
 from infocache.errors.gris import *
 from infocache.errors.stats import *
-from infocache.voms.voms import * 
 import infocache.db.meta as meta
 import infocache.db.ng_schema as schema  
 
 class Gris2db():
     
-    THREAD_LIMIT = 3   # number of GRIS'es that will be queried in parallel
+    THREAD_LIMIT = 10   # number of GRIS'es that will be queried in parallel
     TIMES = ['completiontime','proxyexpirationtime',\
             'sessiondirerasetime','submissiontime'] 
     DELAY = 180   # [seconds], how far back we query for 'new' jobs
@@ -42,7 +41,6 @@ class Gris2db():
         self.last_gris_refresh_time = None
         self.finished_jobs_check = Gris2db.FINISHED_CHECK_CYCLE  
         self.allowed_users_check = Gris2db.ALLOWED_USERS_CHECK_CYCLE  
-        self.__populate_user_vo_map() # XXX call it every x hours
         self.Session = meta.Session
         self.log.debug("Initialization finished")
 
@@ -156,11 +154,11 @@ class Gris2db():
             except Queue.Empty:
                 break 
             try:
-                self.log.debug("Trying gris: %s" % gris)
+                self.log.debug("Trying GRIS: %s" % gris)
                 timestamp = time.time()
                 ng = NGCluster(gris, port)
             except Exception, e: # we do not set cluster to inactive! -> done by other module
-                self.log.error("Gris '%s', got:  %r " % (gris, e))
+                self.log.error("GRIS '%s', got:  %r " % (gris, e))
                 continue
            
             cluster_name = ng.get_name()
@@ -438,11 +436,8 @@ class Gris2db():
         self.allowed_users_check +=1
  
 
+    """
     def __populate_user_vo_map(self):
-        """
-        XXX: Call this every x hours:
-
-        """
         # fetch all users of VOs  -> dict( DN of user -> VOs she's member of)
         user_dict = dict()
         try:
@@ -465,7 +460,7 @@ class Gris2db():
                 if  user_dict[user].count(vo) < 1:
                     user_dict[user].append(vo)
         self.user_vo_map = user_dict
-
+    """
     
     def _populate_statistics(self):
         """ collects statistics about clusters and queues """
@@ -508,6 +503,7 @@ class Gris2db():
                         cstats.set_attribute(attr_name, eval(fct_sig) + cstats.get_attribute(attr_name))   
                         gstats.set_attribute(attr_name, eval(fct_sig) + gstats.get_attribute(attr_name))   
                     # stats about VO usage   
+                    """
                     query = session.query(schema.Job)
                     dbjobs = query.filter(AND(schema.Job.cluster_name == cluster_name,
                             schema.Job.queue_name==dbqueue.name,
@@ -538,12 +534,13 @@ class Gris2db():
                         grid_vo_usage[vos]['walltime'] += walltime
 
                     qstats.set_attribute("vo_usage", queue_vo_usage)
+                    """
                     qstats.pickle_init()
                     cstats.add_child(qstats)
-                cstats.set_attribute("vo_usage", cluster_vo_usage)
+                #cstats.set_attribute("vo_usage", cluster_vo_usage)
                 cstats.pickle_init()
                 gstats.add_child(cstats)
-            gstats.set_attribute("vo_usage", grid_vo_usage)
+            #gstats.set_attribute("vo_usage", grid_vo_usage)
             gstats.pickle_init() 
             
             # check whether stats object exists already, if so overwrite
@@ -559,7 +556,7 @@ class Gris2db():
             session.flush()
             session.commit()
         except Exception, e:
-            self.log.error("OHA: %r", e)
+            self.log.error("Unexpected error: %r", e)
             session.rollback()
         finally:
             session.close()

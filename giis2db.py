@@ -70,7 +70,7 @@ class Giis2db(Daemon):
         self.mds_vo_name = None
         self.rrd_directory = None
         self.periodicity = None
-        self.giis_list = None
+        self.top_giis_list = None
         self.plot_directory = None
         self.command = None
         self.giis_proctime = None
@@ -128,8 +128,8 @@ class Giis2db(Daemon):
             self.log.error("'giis' option missing in %s." % (options.config_file))
             sys.exit(-1)
 
-        self.giis_list = giis_raw.split(',')
-        self.log.info("Using following GIIS'es: %r" % self.giis_list)
+        self.top_giis_list = giis_raw.split(',')
+        self.log.info("Using following top level GIIS'es: %r" % self.top_giis_list)
         
         periodicity = config_parser.config.get('periodicity')
         if not periodicity:
@@ -146,10 +146,6 @@ class Giis2db(Daemon):
        
         self.rrd_directory = config_parser.config.get('rrd_directory') 
         self.plot_directory = config_parser.config.get('plot_directory') 
-        
-        os.environ["X509_USER_CERT"] = config_parser.config.get('usercert')
-        os.environ["X509_USER_KEY"] =  config_parser.config.get('userkey')
-
 
     def __del__(self):
         pass
@@ -191,14 +187,57 @@ class Giis2db(Daemon):
             self.log.debug("Can't reach %s: %r" % (host, e))
             return False        
 
+    def get_giis_gris(self,giis_server, port, mds_vo_name):
+        """ XXX maybe need to detect loops """
+        try:
+            timestamp = time.time()
+            
+            ng = NGGiis(giis_server, mds_vo_name = mds_vo_name)
+            ng_gris_list = ng.get_gris_list() # list of (server, port)
+            ng_giis_list = ng.get_giis_list() # list of (server, port, mds_vo_name)
+            
+            self.giis_proctime[giis_server] = time.time() - timestamp 
+            ng.close()
+
+            for gris in ng_gris_list:
+                if self.gris_list.count(gris) == 0: # avoid duplicates
+                    if gris in self.gris_blacklist.keys():
+                        self.gris_blacklist[gris] -= 1   # decrease counter
+                        if self.gris_blacklist[gris] == 0:
+                            self.gris_blacklist.pop(gris)
+                    elif self.is_gris_reacheable(gris[0], gris[1]):
+                        self.gris_list.append(gris)
+                    else:
+                        self.log.info("blacklisting ('%s','%s') because not reacheable." % (gris[0], gris[1])) 
+                        self.gris_blacklist[gris] = Giis2db.BLACK_LIST_CYCL
+            
+            for server, port, mds_vo_name in ng_giis_list:
+                self.get_giis_gris(server, port, mds_vo_name)
+
+        except Exception, e:
+            # XXX exception handling, or at least better reporting
+            self.log.info("got exception %r", e)
+            
+            
     def __refresh_gris_list(self):
+        port = 2135
         del(self.gris_list)
         self.gris_list = list()
         self.giis_proctime = dict()
-        for giis_server in self.giis_list:
+        for giis_server in self.top_giis_list:
+            self.log.info("Querying top-level GIIS server:'%s'" % giis_server)
+            self.get_giis_gris(giis_server, port, mds_vo_name = self.mds_vo_name)
+        
+
+
+    def __old_refresh_gris_list(self):
+        del(self.gris_list)
+        self.gris_list = list()
+        self.giis_proctime = dict()
+        for giis_server in self.top_giis_list:
             ng = None
             mds_vo_name = self.mds_vo_name
-            self.log.info("querying giis server:'%s'" % giis_server)
+            self.log.info("Querying top-level GIIS server:'%s'" % giis_server)
             try:
                 timestamp = time.time()
                 ng = NGGiis(giis_server, mds_vo_name = mds_vo_name)
@@ -228,6 +267,7 @@ class Giis2db(Daemon):
             last_query_time = db.get_last_query_time() 
             self.gris_whitelist = dict()
             timestamp = time.time()
+            self.log.info("NEW RUN")
             self.__refresh_gris_list() 
             db.refresh_gris_list(self.gris_list)
             if self.gris_blacklist:
@@ -247,6 +287,7 @@ class Giis2db(Daemon):
             cleaner.check_jobs()
             rrd.generate_plots()
             proctime = time.time() - timestamp
+            self.log.info("CURRENT RUN TOOK %s seconds" % proctime)
             if proctime > self.periodicity:
                 continue
             else:

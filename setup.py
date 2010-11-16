@@ -6,7 +6,7 @@ from distutils.core import setup
 
 setup(
     name = "smscg_infocacher",
-    version = "0.8.0",
+    version = "0.9.0",
     description = "Database (MySQL) cacher of ARC Infosys data.",
     long_description = """
 	This module provides a daemon that queries the top-level NorduGrid ARC 

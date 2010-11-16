@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 Class for querying the Nordugrid Information system (GIIS).
 Purpose is to get list of querieable  'GRIS' servers. 
@@ -46,10 +45,11 @@ class NGGiis(LDAPCommon):
         
         if not host.endswith(port_suffix):
             host += port_suffix
-        
+             
         self.mds_vo_name = mds_vo_name
         self.giis_server = host
         self.gris_list = []
+        self.giis_list = []
 
         try:
             self.ldap = ldap.initialize(host)
@@ -61,7 +61,7 @@ class NGGiis(LDAPCommon):
             self.log.error("GIIS ldap error: %s." % e.desc())
             raise GIISError("GIIS ldap error.","GIIS ldap error:" % e.desc())
         
-        self.__populate_gris_list()
+        self.__populate_giis_gris_list()
  
     def __del__(self):
         if self.ldap:
@@ -69,9 +69,15 @@ class NGGiis(LDAPCommon):
     
     def close(self):
         self.ldap.unbind()
+
     
-    def __populate_gris_list(self):
-        base="Mds-Vo-name=%s,o=grid" % self.mds_vo_name
+    def __populate_giis_gris_list(self):
+        
+        if "mds-vo-name" in self.mds_vo_name.lower():
+            base = self.mds_vo_name
+        else:
+            base="Mds-Vo-name=%s,o=grid" % self.mds_vo_name
+        
         filter ="(Mds-Service-hn=*)"
 
         scope = ldap.SCOPE_BASE
@@ -86,17 +92,27 @@ class NGGiis(LDAPCommon):
             (self.giis_server,base,scope,filter,NGGiis.GIIS_ATTRS))
         
         records = LDAPCommon.format_res(self,res)
+        
+        if self.giis_list:
+            del self.giis_list
+            self.giis_list = []
 
         if self.gris_list:
             del self.gris_list
             self.gris_list = []
+
         for rec in records:
             name =  rec.get_attr_values("Mds-Service-hn")[0]
             port  =  rec.get_attr_values("Mds-Service-port")[0]
-            
-            if self.gris_list.count((name,port)) == 0:
-                self.log.info("Found GRIS: '%s:%s'" % (name, port))
-                self.gris_list.append((name,port))
+            suffix = rec.get_attr_values("Mds-Service-Ldap-suffix")[0]
+            if 'nordugrid-cluster-name' in suffix:
+                if self.gris_list.count((name,port)) == 0:
+                    self.log.debug("Found GRIS: '%s:%s'" % (name, port))
+                    self.gris_list.append((name,port))
+            else:
+                if self.giis_list.count((name,port)) == 0:
+                    self.log.debug("Found GIIS: '%s:%s'" % (name, port))
+                    self.giis_list.append((name,port,suffix))
 
     def __refresh_gris_names(self):
         self.gris_list = [] 
@@ -105,16 +121,21 @@ class NGGiis(LDAPCommon):
     def get_gris_list(self):
         """ Returns list of (gris_hostname, port) pairs."""
         return self.gris_list
+    
+    def get_giis_list(self):
+        """ Returns list of (gris_hostname, port, base_name) pairs."""
+        return self.giis_list
 
 
 if __name__ == "__main__":
 
-    mds_vo_name="Switzerland"
-    logging.config.fileConfig("logging.conf")
+    #mds_vo_name="Switzerland"
+    mds_vo_name="NorduGrid"
+    logging.config.fileConfig("/opt/smscg/infocache/etc/logging.conf")
     try:
-        ng = NGGiis("elli.switch.ch:2135", mds_vo_name=mds_vo_name)
-        #ng = NGGiis("disir.switch.ch:2135", mds_vo_name=mds_vo_name)
-        ng = NGGiis("elli.switch.ch:2135", mds_vo_name=mds_vo_name)
+        #ng = NGGiis("elli.switch.ch:2135", mds_vo_name=mds_vo_name)
+        ng = NGGiis("index1.nordugrid.org:2135", mds_vo_name=mds_vo_name)
+        ng = NGGiis("grid.uio.no:2135", mds_vo_name='Norway')
         ng.get_gris_list()
         cnames =  ng.get_gris_list()
         for gris in cnames:

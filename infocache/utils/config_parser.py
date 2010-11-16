@@ -6,9 +6,9 @@ ini-style configuration files.
 Basic error handling has been implemented, ithowever does no semantic checking, 
 e.g. if the option 'server:' has been set an invalid hostname it will not complain.
 """
-__author__="Placi Flury placi.flury@switch.ch"
-__date__="5.1.2010"
-__version__="0.1.0"
+__author__="Placi Flury grid@switch.ch"
+__date__="8.11.2010"
+__version__="0.2.0"
 
 import ConfigParser
 import sys
@@ -58,35 +58,6 @@ class ConfigReader:
                 l.append(it)
         return l 
 
-    def get_voms_servers(self):
-        """ 
-        Returns a dictionary with the VO and the corresponding voms server. 
-        The information about the supported VO and voms servers is read from the 
-        configuration referred by the 'gridmomnitor_configfile'.
-
-        returns --  {<vo_name> : <vo_server>}
-        """ 
-        gm_cfg = self.get('gridmonitor_configfile')
-        self.log.debug("Using following GridMonitor configuration file '%s' to get voms server" % gm_cfg)  
-        parser2 = ConfigParser.ConfigParser()
-        if os.path.exists(gm_cfg) and os.path.isfile(gm_cfg):
-            parser2.read(gm_cfg)
-        else:
-            raise GIIS2DBConfigError("GridMonitor Config file missing", "File '%s' doesn't exist." % (gm_cfg))         
-
-        if not parser2.has_section('app:main'):
-            raise GIIS2DBConfigError("Secion app:main missing", "File '%s' has no app:main section." % (gm_cfg))         
-        
-        voms_raw = parser2.get('app:main','voms')
-        voms_servers = dict()
-        if voms_raw:
-            for voms in  voms_raw.split(','):
-                server = voms.split(':')[0]
-                tail = voms.split(':')[1]
-                for vo in tail.split('|'):
-                    voms_servers[vo] = server.strip()
-        
-        return voms_servers
         
 
     def get(self, option=None):
@@ -122,7 +93,6 @@ class ConfigReader:
 if __name__ == "__main__":
     try:        
         c = ConfigReader(sys.argv[1])
-        print c.get_voms_servers()
         #print c.get_default_mappings()
         #print c.get_pool_accounts()
         g= c.get()

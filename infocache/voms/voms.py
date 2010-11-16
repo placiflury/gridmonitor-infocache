@@ -22,7 +22,7 @@ class VOMSConnector:
             self.log.debug("Trying to fetch VOMS servers from GridMonitor configuration.")
             self.voms_servers = config_parser.config.get_voms_servers()
             self.log.debug("Got following voms servers: '%r'" % self.voms_servers)
-        except GIIS2DBConfigError, ex:
+        except config_parser.GIIS2DBConfigError, ex:
             self.log.error("Configuration error: %s" % ex.message)
             raise VOMS_ENV_ERROR("Configuration Error","Configuration for accessing remote VOMS is faulty.")
         self.voms_opts ={}
