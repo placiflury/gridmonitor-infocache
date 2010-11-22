@@ -1,0 +1,6 @@
+recursive-include config *
+include giis2db.py
+include setup.cfg
+include README
+include LICENSE
+include TODO.txt
