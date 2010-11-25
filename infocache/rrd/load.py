@@ -10,7 +10,6 @@ import infocache.db.meta as meta
 import infocache.db.ng_schema as schema
 
 import time, os.path, commands
-import sqlalchemy as sa
 
 
 class GridLoad(object):

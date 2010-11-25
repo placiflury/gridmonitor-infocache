@@ -11,7 +11,7 @@ import logging
 
 from user import NGUser 
 from job import NGJob
-from infocache.utils.common import LDAPSearchResult, LDAPCommon
+from infocache.utils.common import LDAPCommon
 from infocache.utils.utils import str_cannonize
 from gridmonitor.model.api.queue_api import QueueApi
 

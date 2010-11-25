@@ -13,7 +13,6 @@ from sqlalchemy import or_ as OR
 
 import infocache.db.meta as meta
 import infocache.db.ng_schema as schema
-from infocache.rrd.jobs import Jobs
 
 
 

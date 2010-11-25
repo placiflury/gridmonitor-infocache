@@ -6,8 +6,6 @@ __date__="22..01.2010"
 __version__="0.1.0"
 
 import logging
-from sqlalchemy import and_ as AND
-from sqlalchemy import or_ as OR
 import time, os.path, commands
 from datetime import datetime
 
