@@ -62,7 +62,7 @@ processing_time: time it takes infosys (GRIS) to report on jobs etc.
 t_cluster = sa.Table("cluster",meta.metadata,
         sa.Column('hostname',sa.types.VARCHAR(255), primary_key=True),
         sa.Column('alias',sa.types.VARCHAR(255)),
-        sa.Column('pickle_object',sa.types.PickleType),
+        sa.Column('pickle_object',sa.types.BLOB(131072)),
         sa.Column('status',sa.types.VARCHAR(32)),
         sa.Column('response_time',sa.types.FLOAT,default=-1.0),
         sa.Column('processing_time',sa.types.FLOAT,default=-1.0),

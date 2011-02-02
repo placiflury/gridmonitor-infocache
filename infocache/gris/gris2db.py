@@ -93,9 +93,11 @@ class Gris2db():
             try:
                 session.flush() 
                 session.commit()
-                session.close()
             except Exception, e:
-                self.log.error("%r" % e)
+                session.rollback()
+                self.log.error("%r, rolled back session" % e)
+            finally:
+                session.close()
 
     def set_giis_proctime(self, proctime_dict):
         session = self.Session()
@@ -248,6 +250,7 @@ class Gris2db():
 
         filter = q.set_maxsubtime_status_filter(subtime=self.last_query_time_save_iso, 
             status='DELETED', negation_of_status='True')
+        self.log.debug("XXX FILTER: %s" % filter)
         gris_latest_jobs = q.get_jobs(filter)
 
         self.log.debug("Got %d new  jobs on (%s:%s)" % (len(gris_latest_jobs), hostname, qname))
@@ -436,39 +439,12 @@ class Gris2db():
         self.allowed_users_check +=1
  
 
-    """
-    def __populate_user_vo_map(self):
-        # fetch all users of VOs  -> dict( DN of user -> VOs she's member of)
-        user_dict = dict()
-        try:
-            voms = VOMSConnector()
-        except VOMSException, e:
-            voms = None
-            self.log.error("Could not connect to VOMS, got %r" % e)
-            self.user_vo_map= dict()
-            return
-
-        vo_list = voms.get_vos()
-        self.log.info("Got VO-list: %s" % vo_list)
-
-        for vo in vo_list:
-            ulist = voms.listUsers(vo)
-            for user_record in ulist:
-                user = user_record._DN
-                if not user_dict.has_key(user):
-                    user_dict[user]=list()
-                if  user_dict[user].count(vo) < 1:
-                    user_dict[user].append(vo)
-        self.user_vo_map = user_dict
-    """
     
     def _populate_statistics(self):
         """ collects statistics about clusters and queues """
-        
         # XXX currently we only support stats for one grid. Name set to SMSCG
         #     maybe we need to change this
 
-        # XXX populate VO usage
 
         self.log.debug("Start populating grid usage statistics")
         gstats = NGStats('SMSCG', 'grid')  
@@ -502,39 +478,6 @@ class Gris2db():
                         qstats.set_attribute(attr_name, eval(fct_sig))
                         cstats.set_attribute(attr_name, eval(fct_sig) + cstats.get_attribute(attr_name))   
                         gstats.set_attribute(attr_name, eval(fct_sig) + gstats.get_attribute(attr_name))   
-                    # stats about VO usage   
-                    """
-                    query = session.query(schema.Job)
-                    dbjobs = query.filter(AND(schema.Job.cluster_name == cluster_name,
-                            schema.Job.queue_name==dbqueue.name,
-                            schema.Job.completiontime>=(time.time()-86400))).all() # jobs of last 24 hours
-                    queue_vo_usage = dict()
-                    for dbjob in dbjobs:
-                        owner = dbjob.globalowner
-                        if not owner or not self.user_vo_map.has_key(owner): # orphaned job
-                            continue
-                        walltime = dbjob.usedwalltime
-                        if not walltime:
-                            continue
-                        vlist = self.user_vo_map[owner] # get VOs user belongs to
-                        vos = str(vlist)
-                        if not queue_vo_usage.has_key(vos):
-                            queue_vo_usage[vos] = dict(num_jobs=0, walltime=0)
-                        queue_vo_usage[vos]['num_jobs'] +=1
-                        queue_vo_usage[vos]['walltime'] += walltime
-                        
-                        if not cluster_vo_usage.has_key(vos):
-                            cluster_vo_usage[vos] = dict(num_jobs=0, walltime=0)
-                        cluster_vo_usage[vos]['num_jobs'] +=1
-                        cluster_vo_usage[vos]['walltime'] += walltime
-                        
-                        if not grid_vo_usage.has_key(vos):
-                            grid_vo_usage[vos] = dict(num_jobs=0, walltime=0)
-                        grid_vo_usage[vos]['num_jobs'] +=1
-                        grid_vo_usage[vos]['walltime'] += walltime
-
-                    qstats.set_attribute("vo_usage", queue_vo_usage)
-                    """
                     qstats.pickle_init()
                     cstats.add_child(qstats)
                 #cstats.set_attribute("vo_usage", cluster_vo_usage)
@@ -558,6 +501,7 @@ class Gris2db():
         except Exception, e:
             self.log.error("Unexpected error: %r", e)
             session.rollback()
+            self.log.info("Rolled back session.")
         finally:
             session.close()
 

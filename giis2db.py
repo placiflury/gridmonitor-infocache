@@ -287,7 +287,7 @@ class Giis2db(Daemon):
             cleaner.check_jobs()
             rrd.generate_plots()
             proctime = time.time() - timestamp
-            self.log.info("CURRENT RUN TOOK %s seconds" % proctime)
+            self.log.debug("CURRENT RUN TOOK %s seconds" % proctime)
             if proctime > self.periodicity:
                 continue
             else:
