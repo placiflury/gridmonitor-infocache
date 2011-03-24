@@ -162,12 +162,6 @@ class NGQueue(LDAPCommon, QueueApi):
 
     def get_name(self):
         return self.get_attribute_first_value("name")
-    
-    def get_cname(self):
-        return self.cname
-
-    def get_name(self):
-        return self.get_attribute_first_value("name")
 
     def get_cname(self):
         return self.cname
