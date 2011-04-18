@@ -36,8 +36,9 @@ class RRD(object):
         self.log.info("RDD plots  will be stored in directory '%s'" % plotdir)
 
         self.infosys = GrisGiis(rrddir, plotdir)
-        self.jobs = Jobs(rrddir,plotdir)
         self.gridload = GridLoad(ldir, plotdir)
+        self.jobs = Jobs(rrddir, plotdir)
+        
         self.log.debug("Initialization finished")
 
 

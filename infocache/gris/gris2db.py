@@ -1,511 +1,392 @@
 """
-The Gris2db class is used to store the  
-information from the grid information system into a local database. 
-Notice, it will only populate database with jobs that were submitted since
-the giis2db daemon was started.
+The Gris2db class polls list of GRIS'es and populates
+a database with results from poll. The DB is used by 
+the GridMonitor to display the current state of the Grid.
 """
 from __future__ import with_statement
 
 __author__ = "Placi Flury grid@switch.ch"
-__date__ = "09.11.2010"
-__version__ = "0.2.0"
+__copyright__ = "Copyright 2008-2011, SMSCG an AAA/SWITCH project"
+__date__ = "10.04.2011"
+__version__ = "0.3.0"
 
-import logging, pickle
-import time, threading, Queue
+import logging
+import time
+import cPickle 
+import Queue
+from  threading import Lock, Thread
 from datetime import datetime
 from sqlalchemy import and_ as AND
 from sqlalchemy import or_ as OR
 
-from gris import *
-from statistics import * 
+from arclib import GetClusterInfo
+from arclib import GetClusterJobs
 
-from infocache.errors.gris import *
-from infocache.errors.stats import *
-import infocache.db.meta as meta
-import infocache.db.ng_schema as schema  
 
-class Gris2db():
+from infocache.db import meta, schema
+from infocache.db.cluster import ClusterMeta
+from infocache.errors.db import Input_Error
+from statistics import NGStats
+from access import ClusterAccess
+
+class Gris2db(object):
     
-    THREAD_LIMIT = 10   # number of GRIS'es that will be queried in parallel
-    TIMES = ['completiontime','proxyexpirationtime',\
-            'sessiondirerasetime','submissiontime'] 
-    DELAY = 180   # [seconds], how far back we query for 'new' jobs
-    FINISHED_CHECK_CYCLE = 10  # every x cycle we check wether finished jobs get fetched
-    ALLOWED_USERS_CHECK_CYCLE = 15  # every x cycle update allowed users
+    THREAD_LIMIT = 18       # number of GRIS'es that will be queried in parallel
+    BLACK_COUNTER = 10      # number of query cylces a cluster is blacklisted
+    USER_UPDATE_PERIOD = 7200 # periodicity for updating user access lists in DB in seconds
+
+    JOB_FIN_STATES = ['LOST',
+                'DELETED',
+                'FIN_DELETED',
+                'FLD_DELETED',
+                'KIL_DELETED',
+                'FIN_FETCHED',
+                'KIL_FETCHED',
+                'FLD_FETCHED']  # Job states in DB considered final
 
     def __init__(self):
         self.log = logging.getLogger(__name__)
-        self.gris_q = Queue.Queue(0) # no limit to queue
-        self.whitelist = dict()
-        self.set_last_query_time(0)  # keeps time of last SUCCESSFUL update
-        self.last_gris_refresh_time = None
-        self.finished_jobs_check = Gris2db.FINISHED_CHECK_CYCLE  
-        self.allowed_users_check = Gris2db.ALLOWED_USERS_CHECK_CYCLE  
-        self.Session = meta.Session
+        self.processing_q = Queue.Queue(0)  # no limit to queue, the queue holds the GRISes
+                                            # that will be queried + their insertion_time
+        self.qlock = Lock()                 # processing queue lock
+        self.proc_hosts = []                # keeps track of host(names) in processing_q
+        self.blacklist = {}                 # cluster blacklist
+        self.block = Lock()                 # blacklist lock
+        self.last_cycle_meta = []           # metatdata about last/previous run, used to see
+                                            # whether new clusters/queues got added/removed
+        self.last_users_update = time.time() - Gris2db.USER_UPDATE_PERIOD
+        self.stop_threads = False
         self.log.debug("Initialization finished")
 
-    def refresh_gris_list(self, grislist):
-        for gris in grislist:
-            self.gris_q.put(gris)
-        self.last_gris_refresh_time = time.time()
- 
-    def set_last_query_time(self, t):
-        self.last_query_time_iso= time.strftime('%Y%m%d%H%M%SZ', time.gmtime(t))
-        self.last_query_time = datetime.utcfromtimestamp(t)
-        self.last_query_time_save_iso = time.strftime('%Y%m%d%H%M%SZ', time.gmtime(t-Gris2db.DELAY)) 
 
-    def get_last_query_time(self):
-        return self.last_query_time
-
-    def set_blacklist(self, blacklist):
+    def _add_cluster2blacklist(self, hostname):
+        """ black-lists a cluster. A cluster is
+            only blacklisted on unexpected behavior (that's 
+            different from setting the status to 'inactive'.
+         """
+        self.block.acquire()
+        if self.blacklist.has_key(hostname):
+            if self.blacklist[hostname] == 0:
+                self.blacklist.pop(hostname) 
+            else:
+                self.blacklist[hostname] -= 1
+        else: 
+            self.blacklist[hostname] = Gris2db.BLACK_COUNTER
+        self.block.release()
+        self.log.warn('Cluster %s has been blacklisted' % hostname)
         
-        session = self.Session()
-        for entry in session.query(schema.Grisblacklist).all():
-            session.delete(entry)
-        session.flush()
-        session.commit()
-        
-        if blacklist:
-            self.log.debug("Deactivation blacklist %s" % blacklist)
-            for cluster_name, port  in blacklist:
-                dbgris = schema.Grisblacklist()
-                dbgris.hostname = cluster_name
-                session.add(dbgris)
-                
-                self.log.debug("Deactivating cluster %s" % cluster_name)
-                query = session.query(schema.Cluster)
-                dbcluster= query.filter_by(hostname=cluster_name).first()
-                if not dbcluster:
-                    continue
-                dbcluster.status = 'inactive'
-                dbcluster.db_lastmodified = datetime.utcnow() 
-                
-                self.log.debug("Deactivating all queues of cluster %s" % cluster_name)
-                for q in session.query(schema.Queue).filter_by(hostname=cluster_name).all():
-                    q.status = 'inactive'
-                    q.db_lastmodified = datetime.utcnow() 
-                
-                self.log.debug("Updating users access for cluster %s" % cluster_name)
-    
-                for entry in session.query(schema.UserAccess).filter_by(hostname=cluster_name).all():
-                    session.delete(entry)
-                self.log.debug("User access list updated") 
-            try:
-                session.flush() 
-                session.commit()
-            except Exception, e:
-                session.rollback()
-                self.log.error("%r, rolled back session" % e)
-            finally:
-                session.close()
-
-    def set_giis_proctime(self, proctime_dict):
-        session = self.Session()
-        self.log.debug("Resetting GIIS entries in db...") 
-        for entry in session.query(schema.Giis).all(): 
-            session.delete(entry)
-        
-        for hostname, t in proctime_dict.items():
-            self.log.info("GIIS: %s processing time: %f" % (hostname, t))
-            dbgiis = schema.Giis()
-            dbgiis.hostname = hostname
-            dbgiis.processing_time = t
-            dbgiis.db_lastmodified = datetime.utcnow()
-            session.add(dbgiis)
-        session.flush()
-        session.commit()
-        session.close()
-
-    
-    
-    def set_whitelist(self, whitelist):
-        self.log.debug("Whitelist for clusters: %r" % whitelist.keys())
-        self.whitelist= whitelist
-   
-
-    def _populate(self):
-        """ Populates db with information that gets directly
-            queried from the information system. 
-        """
-        try:
-            session = self.Session()
-            self.log.debug("created session %s" % session)
-            self.__populate_gris_info()
-            self.set_last_query_time(self.last_gris_refresh_time)
-        except Exception, e:
-            self.log.error("While populating db got '%r'" % e)
-            self.log.info("Rolling back session and ignoring exception")
-            session.rollback()
-            self.log.info("Session rolled back")
-        finally:
-            self.log.debug("closing session %s" % session)
-            session.close()
-                 
-    def __populate_gris_info(self):
-        """
-        Fetches information about gris'es (clusters), about the cluster's queues
-        and the users that are allowed on the queues. For the later it creates 
-        access entries. 
-        All this information is stored in the (local) db.
-        For each queue jobs are queried as well. 
-        """
-        session = self.Session()
-        while True:
-            try:
-                gris, port = self.gris_q.get(False) # non-blocking
-            except Queue.Empty:
-                break 
-            try:
-                self.log.debug("Trying GRIS: %s" % gris)
-                timestamp = time.time()
-                ng = NGCluster(gris, port)
-            except Exception, e: # we do not set cluster to inactive! -> done by other module
-                self.log.error("GRIS '%s', got:  %r " % (gris, e))
-                continue
            
-            cluster_name = ng.get_name()
-            queues = ng.get_queues()
+    def _cache_jobs(self, gris_url):
+        """ caches jobs of specified cluster. Returns
+            time it took.
+        """
+        session = meta.Session()
+        timestamp = time.time()
+        try:
+            arc_jobs = GetClusterJobs(gris_url)
+            arc_job_ids = list()            
+
+            # get jobs from db for that cluster
+            for job in arc_jobs:
+                arc_job_ids.append(job.id)
+                db_job = session.query(schema.NGJob).filter_by(global_id=job.id).first()
+                if not db_job: # case: new job
+                    try:
+                        db_job = schema.NGJob(job)
+                        session.add(db_job)
+                    except: # no handling
+                        self.log.error("Job %s could not be inserted in DB." % job.id)
+                elif db_job.status in Gris2db.JOB_FIN_STATES: # case: final db state -> don't update
+                    pass
+                elif job.status == 'DELETED': 
+                    if db_job.status in ['FINISHED','KILLED','FAILED']:
+                        if (db_job.sessiondir_erase_time >= datetime.utcfromtimestamp(0)) and \
+                            (db_job.sessiondir_erase_time <= datetime.utcnow()): # not feched
+                            suffix = '_DELETED'
+                        else:
+                            suffix = '_FETCHED'
+                        if db_job.status == 'FINISHED':
+                            db_job.status = 'FIN_' + suffix
+                        elif db_job.status == 'FAILLED':
+                            db_job.status = 'FLD_' + suffix
+                        elif db_job.status == 'KILLED':
+                            db_job.status = 'KIL_' + suffix
+                    else: # not in any final state
+                        db_job.status = 'LOST'
+                    
+                    db_job.db_lastmodified = datetime.utcnow()
+                    session.add(db_job)
+                else: # case db_job non-final, arc_job not DELETED -> upate to new state
+                    db_job.status = job.status
+                    db_job.db_lastmodified = datetime.utcnow()
+                    session.add(db_job)
             
-            for q in queues:
-                qname = q.get_name()
-                if self.allowed_users_check == 0:
-                    allowed_user_list = list()  
-                    for dn in q.get_allowed_users():
-                        if dn in allowed_user_list:  # avoid duplicates 
-                            continue
-                        allowed_user_list.append(dn)
-                        
-                        # write/update users and user_access entries to/on db
-                        query = session.query(schema.User)
-                        dbuser = query.filter_by(DN=dn).first()
-                        if not dbuser:
-                            dbuser = schema.User()
-                            dbuser.DN = dn
-                            session.add(dbuser)
-                        dbuser.db_lastmodified = datetime.utcnow()
-                        session.flush()
-                
-                        query = session.query(schema.UserAccess)
-                        access_entry = query.filter_by(hostname=cluster_name, queuename=qname, user=dn).first()
-                        if not access_entry:
-                            access_entry = schema.UserAccess()
-                            access_entry.hostname = cluster_name
-                            access_entry.queuename= qname
-                            access_entry.user = dn
-                            session.add(access_entry)
-                        access_entry.db_lastmodified=datetime.utcnow()
-                        session.flush()
-                        session.commit()
-                
-                self.__populate_jobs(q, cluster_name)  # get the jobs
+            # update jobs that got fetched
+            for db_job in session.query(schema.NGJob).filter(
+                AND(schema.NGJob.cluster_name == gris_url.Host(),
+                OR(schema.NGJob.status == 'FINISHED',
+                    schema.NGJob.status == 'KILLED',
+                    schema.NGJob.status == 'FAILED'))).all():
+                if db_job.global_id not in arc_job_ids: # job got fetched
+                    if db_job.status == 'FINISHED':
+                        db_job.status = 'FIN_FETCHED'
+                    elif db_job.status == 'FAILLED':
+                        db_job.status = 'FLD_FETCHED'
+                    elif db_job.status == 'KILLED':
+                            db_job.status = 'KIL_FETCHED'
+                    db_job.db_lastmodified = datetime.utcnow()
+                    session.add(db_job)
 
-                proctime= time.time() - timestamp 
+            session.commit()
+        except Input_Error, er:
+            self.log.error("Could not insert jobs for cluster %s into db, got %s. Rolling back" % \
+                    (gris_url, er.message))
+            session.rollback() 
+        except Exception, er2:
+            self.log.error("Could not insert jobs cluster %s into db, got %r. Rolling back" % \
+                    (gris_url.Host(), er2))
+            session.rollback() 
+        finally:
+            return time.time() - timestamp
 
-                # write/update queue to db
-                q.pickle_init()
-                query = session.query(schema.Queue)
-                dbqueue = query.filter_by(hostname=cluster_name, name=qname).first()
-                if not dbqueue:
-                    dbqueue = schema.Queue() 
-                    dbqueue.name = qname
-                    dbqueue.hostname = cluster_name
-                    session.add(dbqueue)
-                    self.allowed_users_check = -1 # on next cycle allowed_users will be populated
-                dbqueue.status='active'
-                dbqueue.db_lastmodified=datetime.utcnow()
-                dbqueue.pickle_object = pickle.dumps(q)
-                session.flush()
-                session.commit()
+    def _cache_cluster_info(self, gris_url):
+        """ 'thread-save' """
+        session = meta.Session() 
+        try:
+            timestamp = time.time()
+            arc_cluster = GetClusterInfo(gris_url)
+            arc_queues = arc_cluster.queues
 
-            # write/update cluster to db
-            ng.pickle_init()
-            query = session.query(schema.Cluster)
-            dbcluster= query.filter_by(hostname=cluster_name).first()
-            if not dbcluster:
-                self.log.info("Cluster %s created in DB." % cluster_name)
-                dbcluster = schema.Cluster()
-                dbcluster.hostname = cluster_name 
-                session.add(dbcluster)
-                self.allowed_users_check = -1 # on next cycle allowed_users will be populated
-            dbcluster.alias = ng.get_alias()
-            dbcluster.status = 'active'
-            dbcluster.pickle_object = pickle.dumps(ng)
-            dbcluster.db_lastmodified = datetime.utcnow() 
-            dbcluster.processing_time = proctime
-            self.log.info("GRIS: %s processing time: %f" % (cluster_name, proctime))
-            if self.whitelist.has_key(cluster_name):
-                dbcluster.response_time = self.whitelist[cluster_name]
-            session.flush() 
+            cl_meta = ClusterMeta()
+            cl_meta.set_response_time(time.time() - timestamp)
+            cl_meta.set_processing_time(self._cache_jobs(gris_url))
+            cl_meta.whitelisting()
+        
+       
+            db_cluster = schema.NGCluster(arc_cluster)
+            self.log.debug("Updading cluster: %s" % db_cluster.get_name())
+            db_cluster.set_metadata(cl_meta)
+            db_cluster = session.merge(db_cluster)
+ 
+            for q in arc_queues:
+                db_queue = schema.NGQueue(q, arc_cluster.hostname)
+                db_queue.db_lastmodified = datetime.utcnow()
+                db_queue = session.merge(db_queue)
+            
             session.commit()
 
-        
-    def __populate_jobs(self, q, hostname):
-          
-        session = self.Session()
-        processing_start_time = datetime.utcnow()
-        qname = q.get_name() 
-        # A -- every cycle
-        # A1.) get jobs submitted since last query (from gris) [keep them
-        # in memory (or age timestamp), so we don't query things twice]
-
-        filter = q.set_maxsubtime_status_filter(subtime=self.last_query_time_save_iso, 
-            status='DELETED', negation_of_status='True')
-        self.log.debug("XXX FILTER: %s" % filter)
-        gris_latest_jobs = q.get_jobs(filter)
-
-        self.log.debug("Got %d new  jobs on (%s:%s)" % (len(gris_latest_jobs), hostname, qname))
-
-        for grisjob in gris_latest_jobs:
-            id = grisjob.get_globalid()
-            query = session.query(schema.Job)
-            query= query.filter_by(globalid=id)
-            dbjob = query.first()
-            if not dbjob:
-                dbjob = schema.Job()
-                dbjob.globalid = id
-                session.add(dbjob)
-
-            for attr in grisjob.get_attribute_names():
-                attr_values = grisjob.get_attribute_values(attr)
-                if attr_values: # we only go for the first value if any
-                    fval = attr_values[0]
-                else:
-                    fval = None
-                # re-mapping of values
-                if attr == 'execcluster':
-                    dbjob.cluster_name = fval
-                elif attr == 'execqueue':
-                    dbjob.queue_name = fval
-                else:
-                    # convert times (they are already in UTC)
-                    if attr in Gris2db.TIMES and fval:
-                        t = time.strptime(fval, '%Y%m%d%H%M%SZ')
-                        fval = datetime.fromtimestamp(time.mktime(t))
-                    assignment = "dbjob.%s = fval" % attr
-                    exec(assignment)
-            dbjob.db_lastmodified = datetime.utcnow()
-            session.flush()
+        except Input_Error, er:
+            self.log.error("Could not insert cluster %s into db, got %s. Rolling back" % \
+                    (gris_url, er.message))
+            session.rollback() 
+            self._add_cluster2blacklist(arc_cluster.hostname)
+        except Exception, er2:
+            self.log.error("Could not insert cluster %s into db, got %r. Rolling back" % \
+                    (gris_url.Host(), er2))
             
-        # A2.) for all jobs in local db that are not in a final state, check
-        # whether status changed (don't check jobs we just fetched)
-        query = session.query(schema.Job)
-        dbjobs = query.filter(AND(schema.Job.queue_name==qname, schema.Job.cluster_name==hostname,
-            schema.Job.submissiontime<=self.last_query_time, 
-            schema.Job.status!='FINISHED', 
-            schema.Job.status!='FAILED', 
-            schema.Job.status!='KILLED',
-            schema.Job.status!='KIL_DELETED',
-            schema.Job.status!='FIN_DELETED',
-            schema.Job.status!='FLD_DELETED',
-            schema.Job.status!='KIL_FETCHED',
-            schema.Job.status!='FIN_FETCHED',
-            schema.Job.status!='FLD_FETCHED',
-            schema.Job.status!='LOST',
-            schema.Job.status!='DELETED')).all()
-            
-        self.log.debug("Querying for %d (non-final) jobs (%s:%s)" % (len(dbjobs), hostname, qname))
+            self._add_cluster2blacklist(arc_cluster.hostname)
+            session.rollback() 
+                 
+    def _query_grises(self):
+        """
+        Fetches information about gris'es (clusters), about the queues
+        and the jobs.
+        """
         
-        for dbjob in dbjobs:
-            grisjob =q.get_job(dbjob.globalid)
-            if grisjob: #  check whether any of the entries did change
-                for attr in grisjob.get_attribute_names():
-                    attr_values = grisjob.get_attribute_values(attr)
-                    if attr_values:
-                        fval = attr_values[0]
-                    else:
-                        fval = None
-                    if attr == 'execcluster':
-                        if dbjob.cluster_name != fval:
-                            dbjob.cluster_name = fval
-                            dbjob.db_lastmodified = datetime.utcnow()
-                        continue
-                    elif attr == 'execqueue':
-                        if dbjob.queue_name != fval:
-                            dbjob.queue_name = fval
-                            dbjob.db_lastmodified = datetime.utcnow()
-                        continue
-                    else:
-                        # convert times (they are already in UTC)
-                        if attr in Gris2db.TIMES and fval:
-                            t = time.strptime(fval, '%Y%m%d%H%M%SZ')
-                            fval = datetime.fromtimestamp(time.mktime(t))
-                        oldval = eval('dbjob.%s' % attr)
-                        if oldval != fval:
-                            assignment = "dbjob.%s = fval" % attr
-                            exec(assignment)
-                dbjob.db_lastmodified = datetime.utcnow()
-                session.flush()
-            else:  # XXX could job have been feched? (check!!!)
-                """
-                Jobs landing here have slipped through. We take the *assumption*
-                that these jobs may have executed successfully (exepct those that 
-                were in KILLING state).
-                """
-                self.log.info("A2: Job %s (%s) could not be tracked anymore." %
-                (dbjob.globalid, dbjob.status))
+        while not self.stop_threads:
+            gris_url, insert_time = self.processing_q.get(True) # blocking
+            # start doing job
+            self.log.debug("Current queueing time: %s seconds" % (time.time() - insert_time))
+            self._cache_cluster_info(gris_url)
 
-                if dbjob.status == 'KILLING':
-                    dbjob.status = 'KIL_FETCHED'
-                else:
-                    dbjob.status = 'LOST'   # XXX improve
+            # end doing job
 
-                dbjob.completiontime = datetime.utcnow()
-                dbjob.db_lastmodified = datetime.utcnow()
-                session.flush()
+            self.qlock.acquire()
+            host = gris_url.Host()
+            self.proc_hosts.remove(host)
+            self.qlock.release() 
 
-        # A3.) all non-fetched jobs in final state, check whether they got erased 
-        # i.e. if they have been moved to state DELETED
-        query = session.query(schema.Job)
-        dbjobs = query.filter(AND(schema.Job.queue_name==qname, schema.Job.cluster_name==hostname,
-            schema.Job.sessiondirerasetime < self.last_query_time, 
-            OR(schema.Job.status=='FINISHED', schema.Job.status=='FAILED', 
-            schema.Job.status=='KILLED'))).all()
-        if dbjobs: 
-            self.log.debug("Querying for %d finished jobs, that should have been moved to DELETED state on (%s:%s)." 
-                % (len(dbjobs), hostname, qname))
-            for dbjob in dbjobs :
-                grisjob =q.get_job(dbjob.globalid)
-                if grisjob: 
-                    status = grisjob.get_status() # only update status -> no further info loss about job
-                    if status == 'DELETED':
-                        if dbjob.status == 'FINISHED':
-                            dbjob.status = 'FIN_DELETED'  # special state 
-                        elif dbjob.status == 'FAILED':
-                            dbjob.status = 'FLD_DELETED'  # special state 
-                        elif dbjob.status == 'KILLED':
-                            dbjob.status = 'KIL_DELETED'  # special state 
-                        session.flush()
-                    elif status != dbjob.status: # job could have been rerun
-                        self.log.debug("Found job that got rerun")
-                        dbjob.status = status
-                        dbjob.db_lastmodified = datetime.utcnow()
-                        session.flush()
-                else:  # job not anymore found
-                    self.log.info("A3: Job %s (%s) could not be tracked anymore." %
-                     (dbjob.globalid, dbjob.status))
-                    dbjob.status = 'LOST'   # XXX improve
-                    dbjob.complentiontime = datetime.utcnow()
-                    dbjob.db_lastmodified = datetime.utcnow()
-                    session.flush()
+    def _basic_housekeeping(self, active_clusters):
+        """ Do some basic 'cleanup' of DB entries. Should
+            be called once per processing cycle.
+            active_gris_list -- list of currently active clusters. 
+        """
+        self.block.acquire()
+        blacklisted = self.blacklist.keys()
+        self.block.release()
+        
+        self.log.debug("%r" % blacklisted)
 
-        # A4.) check whether final state jobs got fetched. If a job got fetched
-        #      it simply does not show up in information system.
-        if self.finished_jobs_check == 0:
-            query = session.query(schema.Job)
-            dbjobs = query.filter(AND(schema.Job.queue_name==qname, schema.Job.cluster_name==hostname,
-                schema.Job.db_lastmodified <= processing_start_time, 
-                OR(schema.Job.status=='FINISHED', schema.Job.status=='FAILED', 
-                schema.Job.status=='KILLED'))).all()
-            if dbjobs:
-                self.log.debug("Querying for %d final state jobs on (%s:%s)" % (len(dbjobs), hostname, qname))
-                for dbjob in dbjobs:
-                    grisjob =q.get_job(dbjob.globalid)
-                    if not grisjob: # job got fetched
-                        if dbjob.status == 'FINISHED':
-                            dbjob.status = 'FIN_FETCHED'  # special state 
-                        elif dbjob.status == 'FAILED':
-                            dbjob.status = 'FLD_FETCHED'  # special state 
-                        elif dbjob.status == 'KILLED':
-                            dbjob.status = 'KIL_FETCHED'  # special state 
-                        session.flush()
-                    elif grisjob.get_status() != dbjob.status: # job could have been rerun
-                        self.log.debug("Found job that got rerun")
-                        dbjob.status = grisjob.get_status()
-                        dbjob.db_lastmodified = datetime.utcnow()
-                        session.flush()
-        session.commit()
-                
- 
-    def populate(self):
-        if self.finished_jobs_check >=  Gris2db.FINISHED_CHECK_CYCLE:
-            self.finished_jobs_check = 0 
-        if self.allowed_users_check >=Gris2db.ALLOWED_USERS_CHECK_CYCLE:       
-            self.allowed_users_check = 0
- 
-        if self.gris_q.qsize() < Gris2db.THREAD_LIMIT:
-            num_threads = self.gris_q.qsize()
+        session = meta.Session()
+        change = False
+        for cluster in session.query(schema.NGCluster).filter_by(status='active').all():
+            self.log.debug("checking %s" % cluster.hostname)
+            if (cluster.hostname not in active_clusters):
+                cluster.status = 'inactive'
+                change = True
+                for q in session.query(schema.NGQueue).filter_by(hostname=cluster.hostname).all():
+                    q.status = 'inactive'
+                    q.db_lastmodified = datetime.utcnow()
+                    session.add(q) 
+                self.log.info("Deactivating cluster %s" % cluster.hostname)
+                session.add(cluster)
+                self.log.info("Removing users from cluster access list")
+                session.query(schema.UserAccess).filter_by(hostname=cluster.hostname).delete(synchronize='fetch')
+
+            if blacklisted and (cluster.hostname in blacklisted):
+                cluster.blacklisted = True
+                change = True
+                session.add(cluster)
+        if change:
+            session.commit()
+    
+    def _populate_user_access(self, _active_clusters):
+        """ Queries all clusters (respectivley their queues) 
+            for the users that are advertized to have
+            access. 
+        """
+        now = time.time() 
+
+        if (now - self.last_users_update) >= Gris2db.USER_UPDATE_PERIOD:
+            self.last_cycle_meta = _active_clusters[:]
+            
+            db_time_thresh = datetime.utcfromtimestamp(now - 300) # to be on the save side... 
+            self.last_users_update = now
+            
+            self.log.debug("Repopulating user access lists for all active clusters")
+            for hostname in _active_clusters:
+                try:
+                    user_access = ClusterAccess(hostname)
+                    user_access.write_allowed_users2db()
+                except: # XXX handle exception
+                    pass 
+            # remove all old entries
+            self.log.debug("Removing old user access lists") 
+            session = meta.Session()
+            n = session.query(schema.UserAccess).\
+                        filter(schema.UserAccess.db_lastmodified <= db_time_thresh).\
+                        delete(synchronize_session='fetch')
+            self.log.debug("Removed %d access entries for entire Grid" % n)
         else:
-            num_threads = Gris2db.THREAD_LIMIT
-         
-        for n in xrange(num_threads):
-            t = threading.Thread(target=self._populate)
-            t.start()
+            # else just those that were added /removed since last run
+            active_clusters = set(_active_clusters)
+            old_clusters = set(self.last_cycle_meta)
+            self.last_cycle_meta = _active_clusters[:]
+
+            new_clusters = active_clusters - old_clusters
+            rm_clusters = old_clusters - active_clusters
+
+            for hostname in new_clusters:
+                try:
+                    user_access = ClusterAccess(hostname)
+                    user_access.write_allowed_users2db()
+                except: # XXX handle exception
+                    pass 
             
-        while threading.activeCount() > 1: 
-            time.sleep(2)
-        
-        self._populate_statistics()
-        self.finished_jobs_check +=1
-        self.allowed_users_check +=1
- 
+            if rm_clusters:
+                session = meta.Session()
+                for hostname in rm_clusters:
+                    n = session.query(schema.UserAccess).\
+                        filter_by(hostname=hostname).delete(synchronize_session='fetch')
+                    self.log.debug("Removed %d access entries for host %s" % \
+                        (n, hostname))
+                session.commit()
+            
 
     
+    def add_urls2queue(self, url_list):
+        """ Adding list of GRIS URLs to the processing queue. 
+            Duplicate entries are avoided.
+
+            url_list -- list of cluster/Gris URLs of arclib.URL type
+        """
+        active_clusters = list()
+        self.qlock.acquire()
+        for url in url_list:
+            host = url.Host()
+            active_clusters.append(host)
+            self.log.debug("Inserting GRIS %s in processing queue", host)
+            self.block.acquire()
+            black_listed_clusters = self.blacklist.keys() 
+            self.block.release()
+            if (host not in self.proc_hosts) and (host not in black_listed_clusters):
+                self.proc_hosts.append(host)
+                self.processing_q.put((url, time.time()))
+        self.qlock.release()
+            
+        self.log.debug("Starting basic housekeeping")
+        self._basic_housekeeping(active_clusters)
+        
+        self.log.debug("Collecting current usage statistics")
+        self._populate_statistics()
+
+        self.log.debug("Populating User Access lists.")
+        self._populate_user_access(active_clusters)
+
+
+        
+
+        
+    def stop(self):
+        """ Stop all processing."""
+        self.stop_threads = True
+
+    def start(self):
+        """ start processing. """
+        self.stop_threads = False
+        
+        for n in xrange(Gris2db.THREAD_LIMIT):
+            tr = Thread(target=self._query_grises)
+            tr.start()
+
+
     def _populate_statistics(self):
         """ collects statistics about clusters and queues """
         # XXX currently we only support stats for one grid. Name set to SMSCG
         #     maybe we need to change this
 
-
         self.log.debug("Start populating grid usage statistics")
-        gstats = NGStats('SMSCG', 'grid')  
-       
-        # read fetch active clusters from db
-        session = self.Session() 
-        query = session.query(schema.Cluster)
+        gstats = NGStats('SMSCG', 'grid')
+        
+        session = meta.Session()
+        query = session.query(schema.NGCluster)
         try:
-            grid_vo_usage = dict()
-            dbclusters = query.filter_by(status='active').all() 
-            for dbcluster in dbclusters:
-                cl = pickle.loads(dbcluster.pickle_object)
-                cluster_name = dbcluster.hostname
-                cstats = NGStats(cluster_name, 'cluster')
-            
+            for cluster in query.filter_by(status='active').all():
+                cstats = NGStats(cluster.hostname, 'cluster')
+
                 for attr_name in NGStats.CSTATS_ATTRS:
-                    fct_sig ="cl.get_%s()" % attr_name
-                    cstats.set_attribute(attr_name, eval(fct_sig))
-                    gstats.set_attribute(attr_name, eval(fct_sig) + gstats.get_attribute(attr_name))
-                    
-                query = session.query(schema.Queue)
-                dbqueues = query.filter_by(hostname=cluster_name, status='active').all() 
-               
-             
-                cluster_vo_usage = dict()
-                for dbqueue in dbqueues:
-                    q = pickle.loads(dbqueue.pickle_object)
-                    qstats = NGStats(dbqueue.name, 'queue') 
+                    cval = eval("cluster.%s" % attr_name)
+                    cstats.set_attribute(attr_name, cval)
+                    gstats.set_attribute(attr_name, cval + gstats.get_attribute(attr_name))
+
+                for queue in cluster.queues:                
+                    if queue.status != 'active':
+                        continue
+                    qstats = NGStats(queue.name, 'queue')
+
                     for attr_name in NGStats.QSTATS_ATTRS:
-                        fct_sig = "q.get_%s()" % attr_name
-                        qstats.set_attribute(attr_name, eval(fct_sig))
-                        cstats.set_attribute(attr_name, eval(fct_sig) + cstats.get_attribute(attr_name))   
-                        gstats.set_attribute(attr_name, eval(fct_sig) + gstats.get_attribute(attr_name))   
+                        qval = eval("queue.%s" % attr_name)
+                        qstats.set_attribute(attr_name, qval)
+                        cstats.set_attribute(attr_name, qval + cstats.get_attribute(attr_name))
+                        gstats.set_attribute(attr_name, qval + gstats.get_attribute(attr_name))
+
                     qstats.pickle_init()
                     cstats.add_child(qstats)
-                #cstats.set_attribute("vo_usage", cluster_vo_usage)
                 cstats.pickle_init()
                 gstats.add_child(cstats)
-            #gstats.set_attribute("vo_usage", grid_vo_usage)
-            gstats.pickle_init() 
-            
-            # check whether stats object exists already, if so overwrite
-            query= session.query(schema.GridStats)
-            dbgstats = query.filter_by(gridname='SMSCG').first()
-
-            if not dbgstats:
-                dbgstats = schema.GridStats()
-                dbgstats.gridname='SMSCG'
-                session.add(dbgstats)
-            dbgstats.pickle_object = pickle.dumps(gstats)
-            dbgstats.db_lastmodified=datetime.utcnow()
-            session.flush()
+        
+    
+            gstats.pickle_init()
+            dbgstats = schema.GridStats('SMSCG')
+            dbgstats.pickle_object = cPickle.dumps(gstats)
+            dbgstats.db_lastmodified = datetime.utcnow()
+            dbgstats = session.merge(dbgstats)
             session.commit()
         except Exception, e:
             self.log.error("Unexpected error: %r", e)
             session.rollback()
             self.log.info("Rolled back session.")
-        finally:
-            session.close()
 
-        
 
 
 

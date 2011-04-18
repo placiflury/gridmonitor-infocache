@@ -1,22 +1,23 @@
 """
 Generation of RRD plots of grid, cluster and queue loads.
 """
-__author__ = "Placi Flury placi.flury@switch.ch"
+__author__ = "Placi Flury grid@switch.ch"
 __date__ = "16.04.2010"
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
-import logging, pickle
-import infocache.db.meta as meta
-import infocache.db.ng_schema as schema
+import logging
+import time
+import os.path
+import  commands # XXX change to subprocess
+import cPickle
+from datetime import datetime
 
-import time, os.path, commands
-
+from infocache.db import meta, schema
 
 class GridLoad(object):
 
     def __init__(self, rrddir, plotdir):
         self.log = logging.getLogger(__name__)
-        self.Session = meta.Session
         self.rrddir = rrddir
         self.plotdir = plotdir
         self.log.debug("Initialization finished")
@@ -199,20 +200,20 @@ class GridLoad(object):
 
     def statistics(self):
         self.log.debug("Populating load statistics RDD.")
-        session = self.Session()
+        session = meta.Session()
         
         stats = session.query(schema.GridStats).first()
         if not stats:
             return
 
-        gstats = pickle.loads(stats.pickle_object)      
+        gstats = cPickle.loads(stats.pickle_object)      
         #grid_name = gstats.get_name()
         grid_name = 'Grid' # using this instead of grid-name
         self._statistics(grid_name, gstats)
 
         for cluster in gstats.get_children():
             cluster_name = cluster.get_name()
-            # XXX do same for queues ... if wanted
+            # XXX do same for queues ... if desired/requested
             self._statistics(cluster_name, cluster)
 
 
@@ -223,13 +224,13 @@ class GridLoad(object):
                 self.create_rrd(dbn)
 
         
-        totalcpus = stats.get_attribute('totalcpus')
-        usedcpus = stats.get_attribute('usedcpus')
-        gridrunning = stats.get_attribute('gridrunning')
+        totalcpus = stats.get_attribute('total_cpus')
+        usedcpus = stats.get_attribute('used_cpus')
+        gridrunning = stats.get_attribute('grid_running')
         running = stats.get_attribute('running')
-        gridqueued = stats.get_attribute('gridqueued')
-        localqueued = stats.get_attribute('localqueued')
-        prelrmsqueued = stats.get_attribute('prelrmsqueued')
+        gridqueued = stats.get_attribute('grid_queued')
+        localqueued = stats.get_attribute('local_queued')
+        prelrmsqueued = stats.get_attribute('prelrms_queued')
 
         cmd = 'rrdtool update %s -t\
              totalcpus:usedcpus:gridrunning:running:gridqueued:localqueued:prelrmsqueued \
@@ -248,16 +249,3 @@ class GridLoad(object):
     def generate_plots(self):
         self.statistics()
 
-
-if __name__ == '__main__':
-    import logging.config
-    LOG_FILENAME = 'test.log'
-    logging.basicConfig(filename=LOG_FILENAME,level=logging.DEBUG)
-
-
-
-    rrd_db = '/opt/GridMonitor/gridmonitor/rrd/load/'
-    rrd_plot = '/opt/GridMonitor/gridmonitor/public/rrd'
-
-    ld = GridLoad(rrd_db, rrd_plot)
-    ld.generate_plots() 

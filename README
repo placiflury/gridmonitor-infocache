@@ -1,7 +1,4 @@
 ARC information system (currently GRIS) cacher. The information that gets
 queried is stored into a DB (mysql) and can be read by the GridMonitor.
 
-- pre-requisites: IGTF host certificate and bundle  in /etc/grid-security
-
 - dependencies: . Gridmonitor APIs
-                . glite voms-admin client tools (patched)

@@ -1,4 +1,4 @@
-class GRISError(Exception):
+class GRIS_ERROR(Exception):
     """ 
     Exception raised for GRIS errors.
     Attributes:
@@ -10,7 +10,7 @@ class GRISError(Exception):
         self.message = message
 
 
-class CONNECT_ERROR(GRISError):
+class CONNECT_ERROR(GRIS_ERROR):
     """Exception raised if GRIS not reacheable.
     """
     pass

@@ -13,10 +13,10 @@ from infocache.errors.stats import *
 
 class NGStats(StatsApi):
 
-    QSTATS_ATTRS=['cpus','gridrunning','gridqueued','localqueued',\
-                'prelrmsqueued','running'] # queue attributes
-    CSTATS_ATTRS=['totaljobs','usedcpus','totalcpus']  # cluster attributes. Notice queue stats will be summed
-                                                       # up to cluster stats
+    QSTATS_ATTRS=['total_cpus','grid_running','grid_queued','local_queued',\
+                'prelrms_queued','running'] # queue attributes
+    CSTATS_ATTRS=['total_jobs','used_cpus','total_cpus']  # cluster attributes, appended 
+                                                       # to cluster stats
 
     STATS_ATTRS = QSTATS_ATTRS + CSTATS_ATTRS 
 
@@ -48,7 +48,6 @@ class NGStats(StatsApi):
             self.log.warn("Assigment to unknown object attribute ('%s')" %(attr_name))
             
     def add_child(self,child):
-        # XXX adding a check if child has correct type 
         if isinstance(child,NGStats):
             self.children.append(child)
         else: 

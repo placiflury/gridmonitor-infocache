@@ -1,7 +1,6 @@
-
-class CacheError(Exception):
+class DbError(Exception):
     """ 
-    Exception raised for Cache errors.
+    Exception raised for Database  errors.
     Attributes:
         expression -- input expression in which error occurred
         message -- explanation of error 
@@ -11,13 +10,8 @@ class CacheError(Exception):
         self.message = message
 
 
-class CREATE_ERROR(CacheError):
-    """Exception raised if Cache could not be created.
-    """
-    pass
-
-class ACCESS_ERROR(CacheError):
-    """Exception raised if Cache could not be accessed.
+class Input_Error(DbError):
+    """Exception raised for invalid input.
     """
     pass
 

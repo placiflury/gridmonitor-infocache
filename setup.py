@@ -6,27 +6,26 @@ from distutils.core import setup
 
 setup(
     name = "smscg_infocacher",
-    version = "0.9.0",
-    description = "Database (MySQL) cacher of ARC Infosys data.",
+    version = "1.0.0",
+    description = "Database (MySQL) caching engine for ARC Information system data.",
     long_description = """
 	This module provides a daemon that queries the top-level NorduGrid ARC 
-	GIIS. From the GIIS it fetches the list of information system front-ends
-	(GRIS'es), which get quired in 2 minutes intevals. The information about
-	cluster and queue status, as well as about user jobs etc. is then stored
-	in a local database (like MySQL). 
-	The daemon further creates rrd plots (and DBs) on GIIS and GRIS response
-	and processing times and on the jobs (#number of jobs, queue backlogs etc.) 
+	GIIS(es). From the GIIS it fetches the list of information system front-ends
+	(GRIS'es), which get queried in 2 minutes intervals (configurable). 
+    The information about cluster and queue status, as well as about user jobs etc. 
+    is then stored in a local database (like MySQL). 
+	The daemon can further be run to create rrd plots (and DBs) on GIIS and GRIS response
+	and processing times and on the jobs (#number of jobs, queue backlogs etc.). 
     """,
     platforms = "Linux",
-    license = "BSD. Copyright (c) 2008, SMSCG - Swiss Multi Science Computing Grid. All rights reserved." ,
+    license = "BSD. Copyright (c) 2008 - 2011, SMSCG - Swiss Multi Science Computing Grid. All rights reserved." ,
     author = "Placi Flury",
     author_email = "grid@switch.ch",
     url = "http://www.smscg.ch",
-    download_url = "http://repo.smscg.ch",
-    packages = ['infocache','infocache/db', 'infocache/gris', 'infocache/sanity',
-                'infocache/errors', 'infocache/utils', 'infocache/voms', 
-                'infocache/voms/errors', 'infocache/rrd'],
-    scripts = ['giis2db.py'],
+    download_url = "https://subversion.switch.ch/svn/smscg/smscg/ch.smscg.infocache",
+    packages = ['infocache','infocache/db', 'infocache/gris',
+                'infocache/errors', 'infocache/utils'],
+    scripts = ['infocacher.py'],
     data_files=[('.',['config/config.ini','config/logging.conf'])]
 )
 

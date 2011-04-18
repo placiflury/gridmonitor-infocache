@@ -1,22 +1,22 @@
 """
 Generation of GRIS and GIIS  RRD plots.
 """
-__author__="Placi Flury placi.flury@switch.ch"
+__author__="Placi Flury grid@switch.ch"
 __date__="22..01.2010"
-__version__="0.1.0"
+__version__="0.2.0"
 
 import logging
-import time, os.path, commands
+import time
+import os.path
+import  commands # XXX change to subprocess
 from datetime import datetime
 
-import infocache.db.meta as meta
-import infocache.db.ng_schema as schema
+from infocache.db import meta, schema
 
 class GrisGiis(object):
 
     def __init__(self,rrddir, plotdir):
         self.log = logging.getLogger(__name__)
-        self.Session = meta.Session
         self.rrddir = rrddir
         self.plotdir = plotdir
         self.log.debug("Initialization finished")
@@ -100,22 +100,32 @@ class GrisGiis(object):
 
  
     def gris(self):
+        """ Populating RRD with Gris response and processing times. """
+
         self.log.debug("Populating RDD with gris response and processing times.")
-        session = self.Session()
-        query = session.query(schema.Cluster)
-        
+        session = meta.Session()
+       
+        """
+        query = session.query(schema.NGCluster)
         clusters= query.filter_by(status='active').all()
+        """
         
-        for cluster in clusters:
+        for cluster in session.query(schema.NGCluster).all():
             # check whether rrd db exists 
             dbn = os.path.join(self.rrddir,cluster.hostname+'.rrd')
             if not os.path.exists(dbn):
                 self.create_rrd(dbn) 
-            response_time = cluster.response_time
-            processing_time = cluster.processing_time
+
+            cm = cluster.get_metadata()
+
+            response_time = cm.get_response_time()
+            processing_time = cm.get_processing_time()
+
+
             dt = cluster.db_lastmodified # GMT time 
             t_epoch = time.mktime(dt.timetuple()) + \
                  dt.microsecond/1000000.0 - time.timezone # datetime does not care about microsecs
+
             cmd = 'rrdtool update %s -t response_time:processing_time %d:%f:%f' \
                 % (dbn, t_epoch, response_time, processing_time)
          
@@ -129,19 +139,24 @@ class GrisGiis(object):
         session.expunge_all()
 
     def giis(self):
-        self.log.debug("Populating RDD with gris response and processing times.")
-        session = self.Session()
-        last_query_time = datetime.utcfromtimestamp(time.time() - 120)  # assuming 120 sec query cycle
-        giises = session.query(schema.Giis).filter(schema.Giis.db_lastmodified>=last_query_time).all()
+        """ Populating RDD with GIIS response and processing times. """  
+
+        self.log.debug("Populating RDD with GIIS response and processing times.")
+        session = meta.Session()
         
-        for giis in giises:
-            dbn = os.path.join(self.rrddir,giis.hostname+'.rrd')
+        """
+        last_query_time = datetime.utcfromtimestamp(time.time() - 120)  # assuming 120 sec query cycle
+        giises = session.query(schema.GiisMeta).filter(schema.GiisMeta.db_lastmodified>=last_query_time).all()
+        """
+        
+        for giis in session.query(schema.GiisMeta).all():
+            dbn = os.path.join(self.rrddir, giis.get_hostname()+'.rrd')
             if not os.path.exists(dbn):
                 self.create_rrd(dbn) # we use same func for giis
-            response_time = giis.processing_time
-            processing_time = giis.processing_time
+            response_time = giis.get_response_time()
+            processing_time = giis.get_processing_time()
             
-            dt = giis.db_lastmodified # GMT time 
+            dt = giis.get_db_lastmodified() # GMT time 
             t_epoch = time.mktime(dt.timetuple()) + \
                  dt.microsecond/1000000.0 - time.timezone # datetime does not care about microsecs
             cmd = 'rrdtool update %s -t response_time:processing_time %d:%f:%f' \
@@ -153,7 +168,7 @@ class GrisGiis(object):
             else:
                 self.log.debug("UpdatedRDD database '%s'" % dbn)
             
-            self.create_plots(giis.hostname, type='GIIS')
+            self.create_plots(giis.get_hostname(), type='GIIS')
     
     def generate_plots(self):
         self.gris()

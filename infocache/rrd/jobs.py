@@ -1,20 +1,19 @@
 """
 Generation of RRD plots of job status.
 """
-__author__ = "Placi Flury placi.flury@switch.ch"
-__date__ = "22..01.2010"
+__author__ = "Placi Flury grid@switch.ch"
+__date__ = "22.01.2010"
 __version__ = "0.1.0"
 
 import logging
+import time
+import os.path
+import  commands # XXX change to subprocess
+from datetime import datetime
 from sqlalchemy import and_ as AND
 from sqlalchemy import or_ as OR
 
-import infocache.db.meta as meta
-import infocache.db.ng_schema as schema
-import time, os.path, commands
-from datetime import datetime
-
-
+from  infocache.db import meta, schema
 
 class Jobs(object):
     """
@@ -37,7 +36,6 @@ class Jobs(object):
 
     def __init__(self, rrddir, plotdir):
         self.log = logging.getLogger(__name__)
-        self.Session = meta.Session
         self.rrddir = rrddir
         self.plotdir = plotdir
         t_now = time.time()
@@ -68,39 +66,38 @@ class Jobs(object):
          RRA:AVERAGE:0.5:360:365\
          RRA:MAX:0.5:1:720\
          RRA:MAX:0.5:15:336:\
-         RRA:MAX:0.5:360:365" %  (dbname,now) 
+         RRA:MAX:0.5:360:365" %  (dbname, now) 
 
-        (code,output) = commands.getstatusoutput(cmd)
-        if code !=0:
+        (code, output) = commands.getstatusoutput(cmd)
+        if code != 0:
             self.log.error( output)
         else:
             self.log.info("Created RDD database '%s'" % dbname)
    
 
-    def _get_num_walltime(self,joblist):
+    def _get_num_walltime(self, joblist):
         """
-        XXX split it according to cluster
+        XXX break it down per  cluster
         """
         if not joblist:
             return 0, 0
 
         walltime=0
         for job in joblist:
-            w = job.usedwalltime
+            w = job.used_wall_time
             if w:
-                walltime+=w
+                walltime += w
 
         return len(joblist), walltime
         
  
     def final_jobs(self):
-    
         """
         Creation of RRD db with gridjobs that are in a final state
         """
         self.log.debug("Populating RDD with jobs in final status.")
-        session = self.Session()
-        query = session.query(schema.Job)
+        session = meta.Session()
+        query = session.query(schema.NGJob)
        
         last_t_s_epoch = time.time() - Jobs.SAFETY_DELAY 
 
@@ -120,35 +117,36 @@ class Jobs(object):
             self.create_rrd(dbn) 
         
         # jobs that failed:  FLD_DELETED -> we do not really care
-        failed_jobs = session.query(schema.Job).filter(AND(schema.Job.completiontime > t_s,
-            schema.Job.completiontime <= t_e, 
-            OR(schema.Job.status == 'FAILED',schema.Job.status=='FLD_DELETED',
-            schema.Job.status=='FLD_FETCHED'))).all()
-        nfailed,wfailed = self._get_num_walltime(failed_jobs)
+        failed_jobs = session.query(schema.NGJob).filter(AND(schema.NGJob.completion_time > t_s,
+            schema.NGJob.completion_time <= t_e, 
+            OR(schema.NGJob.status == 'FAILED', schema.NGJob.status == 'FLD_DELETED',
+            schema.NGJob.status == 'FLD_FETCHED'))).all()
+        nfailed, wfailed = self._get_num_walltime(failed_jobs)
+
         
-        # jobs that got killed: KIL_DELETE -> we do not really care 
-        killed_jobs = session.query(schema.Job).filter(AND(schema.Job.completiontime > t_s,
-            schema.Job.completiontime <= t_e, 
-            OR(schema.Job.status == 'KILLED',schema.Job.status == 'KIL_DELETED',
-            schema.Job.status == 'KIL_FETCHED'))).all()
-        nkilled,wkilled = self._get_num_walltime(killed_jobs)
+        # jobs that got killed: KIL_DELETED -> we do not really care 
+        killed_jobs = session.query(schema.NGJob).filter(AND(schema.NGJob.completion_time > t_s,
+            schema.NGJob.completion_time <= t_e, 
+            OR(schema.NGJob.status == 'KILLED',schema.NGJob.status == 'KIL_DELETED',
+            schema.NGJob.status == 'KIL_FETCHED'))).all()
+        nkilled, wkilled = self._get_num_walltime(killed_jobs)
+        
 
         #finished jobs (fetched and not yet fetched by user)
-        finished_jobs = session.query(schema.Job).filter(AND(schema.Job.completiontime > t_s,
-            schema.Job.completiontime <= t_e, 
-            OR(schema.Job.status == 'FINISHED', schema.Job.status=='FIN_FETCHED'))).all()
-        nfinished,wfinished = self._get_num_walltime(finished_jobs)
-        
+        finished_jobs = session.query(schema.NGJob).filter(AND(schema.NGJob.completion_time > t_s,
+            schema.NGJob.completion_time <= t_e, 
+            OR(schema.NGJob.status == 'FINISHED', schema.NGJob.status =='FIN_FETCHED'))).all()
+        nfinished, wfinished = self._get_num_walltime(finished_jobs)
 
         # finished jobs that got deleted before they got fetched-> wasted jobs
-        wasted_jobs = session.query(schema.Job).filter(AND(schema.Job.sessiondirerasetime > t_s,
-            schema.Job.sessiondirerasetime <= t_e, schema.Job.status == 'FIN_DELETED')).all()
-        ndeleted,wdeleted = self._get_num_walltime(wasted_jobs)
+        wasted_jobs = session.query(schema.NGJob).filter(AND(schema.NGJob.sessiondir_erase_time > t_s,
+            schema.NGJob.sessiondir_erase_time <= t_e, schema.NGJob.status == 'FIN_DELETED')).all()
+        ndeleted, wdeleted = self._get_num_walltime(wasted_jobs)
         
         # jobs we lost track
-        lost_jobs = session.query(schema.Job).filter(AND(schema.Job.completiontime > t_s,
-            schema.Job.completiontime <= t_e, schema.Job.status == 'LOST')).all()
-        nlost,wlost = self._get_num_walltime(lost_jobs)
+        lost_jobs = session.query(schema.NGJob).filter(AND(schema.NGJob.completion_time > t_s,
+            schema.NGJob.completion_time <= t_e, schema.NGJob.status == 'LOST')).all()
+        nlost, wlost = self._get_num_walltime(lost_jobs)
 
         self.log.debug("JOBS: faild: %d (%d) killd: %d (%d) finishd %d (%d), deletd: %d (%d), lost: %d (%d)"
              % (nfailed, wfailed, nkilled, wkilled, nfinished, wfinished, ndeleted, wdeleted,nlost,wlost))
@@ -156,11 +154,13 @@ class Jobs(object):
         cmd = 'rrdtool update %s -t \
              failed:failed_walltime:killed:killed_walltime:finished:finished_walltime:deleted:deleted_walltime:lost:lost_walltime \
              %d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d' \
-             % (dbn, t_e_epoch, nfailed, wfailed, nkilled, wkilled, nfinished, wfinished, ndeleted, wdeleted,nlost,wlost)
+             % (dbn, t_e_epoch, nfailed, wfailed, nkilled, 
+            wkilled, nfinished, wfinished, ndeleted, 
+            wdeleted, nlost, wlost)
        
  
         (code,output) = commands.getstatusoutput(cmd)
-        if code !=0:
+        if code != 0:
             self.log.error( output)
         else:
             self.log.debug("Updated RDD database '%s'" % dbn)
@@ -173,7 +173,7 @@ class Jobs(object):
         self.final_jobs()
         
 
-    def _make_cmd(self,fig_name,start,end,rrd_file, type='num_jobs'):
+    def _make_cmd(self, fig_name, start, end, rrd_file, type='num_jobs'):
    
         if type== 'num_jobs':
             cmd = "rrdtool graph %s -s %d -e %d --title='Number of Grid jobs in final states' \
@@ -235,7 +235,9 @@ class Jobs(object):
                  AREA:nfined#CCFFFF:'FINISHED:STACK'\
                  GPRINT:nfined_min:\"   %%2.2lf\" \
                  GPRINT:nfined_avg:\"     %%2.2lf\" \
-                 GPRINT:nfined_max:\"      %%2.2lf\l\"" % (fig_name, start, end ,rrd_file,rrd_file,rrd_file,rrd_file,rrd_file)
+                 GPRINT:nfined_max:\"      %%2.2lf\l\"" % \
+                    (fig_name, start, end, rrd_file,
+                    rrd_file, rrd_file, rrd_file, rrd_file)
         else:
             cmd  = "rrdtool graph %s -s %d -e %d --title='Walltime of Grid jobs in final states' \
                  DEF:wfined=%s:finished_walltime:AVERAGE \
@@ -297,7 +299,9 @@ class Jobs(object):
                  AREA:wfined#CCFFFF:'FINISHED:STACK'\
                  GPRINT:wfined_min:\"    %%2.2lf\" \
                  GPRINT:wfined_avg:\"     %%2.2lf\" \
-                 GPRINT:wfined_max:\"     %%2.2lf\l\"" % (fig_name, start, end,rrd_file,rrd_file,rrd_file,rrd_file,rrd_file)
+                 GPRINT:wfined_max:\"     %%2.2lf\l\"" % \
+                     (fig_name, start, end, rrd_file,
+                    rrd_file, rrd_file, rrd_file, rrd_file)
 
         return cmd
 
@@ -307,45 +311,45 @@ class Jobs(object):
         h24_e = time.time()
         h24_s = h24_e - 24 * 3600
         
-        fig24_name = os.path.join(self.plotdir, Jobs.FINAL_JOBS_RRD[:-4]+'nj_h24.png') # 24hours plot
+        fig24_name = os.path.join(self.plotdir, Jobs.FINAL_JOBS_RRD[:-4] + 'nj_h24.png') # 24hours plot
         cmd = self._make_cmd(fig24_name, h24_s, h24_e, rrd_file)
-        (code,output) = commands.getstatusoutput(cmd)
-        if code !=0:
+        (code, output) = commands.getstatusoutput(cmd)
+        if code != 0:
             self.log.error( output)
         
-        fig24_name = os.path.join(self.plotdir,Jobs.FINAL_JOBS_RRD[:-4]+'wj_h24.png') # 24hours plot
-        cmd = self._make_cmd(fig24_name, h24_s, h24_e, rrd_file,type='walltime')
-        (code,output) = commands.getstatusoutput(cmd)
+        fig24_name = os.path.join(self.plotdir, Jobs.FINAL_JOBS_RRD[:-4] + 'wj_h24.png') # 24hours plot
+        cmd = self._make_cmd(fig24_name, h24_s, h24_e, rrd_file, type='walltime')
+        (code, output) = commands.getstatusoutput(cmd)
         if code !=0:
             self.log.error( output)
         
         hw1_e = time.time()
         hw1_s = hw1_e - 24 * 3600 * 7 
 
-        figw1_name = os.path.join(self.plotdir,Jobs.FINAL_JOBS_RRD[:-4]+'nj_w1.png') 
-        cmd = self._make_cmd(figw1_name,hw1_s,hw1_e, rrd_file)
-        (code,output) = commands.getstatusoutput(cmd)
+        figw1_name = os.path.join(self.plotdir, Jobs.FINAL_JOBS_RRD[:-4] + 'nj_w1.png') 
+        cmd = self._make_cmd(figw1_name, hw1_s, hw1_e, rrd_file)
+        (code, output) = commands.getstatusoutput(cmd)
         if code !=0:
             self.log.error( output)
         
-        figw1_name = os.path.join(self.plotdir,Jobs.FINAL_JOBS_RRD[:-4]+'wj_w1.png')
-        cmd = self._make_cmd(figw1_name,hw1_s,hw1_e, rrd_file,type='walltime')
-        (code,output) = commands.getstatusoutput(cmd)
+        figw1_name = os.path.join(self.plotdir, Jobs.FINAL_JOBS_RRD[:-4] + 'wj_w1.png')
+        cmd = self._make_cmd(figw1_name, hw1_s, hw1_e, rrd_file, type='walltime')
+        (code, output) = commands.getstatusoutput(cmd)
         if code !=0:
             self.log.error( output)
         
         hy1_e = time.time()
         hy1_s = hy1_e - 24 * 3600 * 365
         
-        figy1_name = os.path.join(self.plotdir,Jobs.FINAL_JOBS_RRD[:-4]+'nj_y1.png') # one year  plot
-        cmd = self._make_cmd(figy1_name,hy1_s, hy1_e,  rrd_file)
-        (code,output) = commands.getstatusoutput(cmd)
+        figy1_name = os.path.join(self.plotdir, Jobs.FINAL_JOBS_RRD[:-4] + 'nj_y1.png') # one year  plot
+        cmd = self._make_cmd(figy1_name, hy1_s, hy1_e,  rrd_file)
+        (code, output) = commands.getstatusoutput(cmd)
         if code !=0:
             self.log.error( output)
 
-        figy1_name = os.path.join(self.plotdir,Jobs.FINAL_JOBS_RRD[:-4]+'wj_y1.png') # one year  plot
-        cmd = self._make_cmd(figy1_name,hy1_s, hy1_e,  rrd_file,type='walltime')
-        (code,output) = commands.getstatusoutput(cmd)
+        figy1_name = os.path.join(self.plotdir, Jobs.FINAL_JOBS_RRD[:-4] + 'wj_y1.png') # one year  plot
+        cmd = self._make_cmd(figy1_name, hy1_s, hy1_e,  rrd_file, type='walltime')
+        (code, output) = commands.getstatusoutput(cmd)
         if code !=0:
             self.log.error( output)
 
