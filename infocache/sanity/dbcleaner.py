@@ -33,14 +33,8 @@ class Cleanex(object):
             schema.NGCluster.status == 'inactive')).all()
 
         for cluster in inactive_clusters:
-            cname = cluster.hostname
-            self.log.info("Removing inactivate cluster '%s'" % cname)
-            # queues will be removed automatically by cascading configuration given in schema
-            # should already removed when cluster was set inactive.
-            n = session.query(schema.UserAccess).filter_by(hostname=cname).delete()
-            self.log.debug("By removing cluster, we removed %d user access entries" % n)
+            self.log.info("Removing inactivate cluster '%s'" % cluster.hostname)
             session.delete(cluster)
-            self.log.info("Removed cluster %s from db" % cname)
 
         if inactive_clusters:
             session.commit()
@@ -81,6 +75,16 @@ class Cleanex(object):
                     schema.NGJob.status == 'LOST')).delete()
         if ljobs > 0:
             self.log.info("Removing %d 'LOST' jobs from db." % ljobs) 
+
+        # 4.) remove job's we did not track properly (e.g. which were in a final
+        # state when we started populating the database etc.
+        
+        old_jobs = session.query(schema.NGJob).filter(AND(schema.NGJob.db_lastmodified <= fetched_before, 
+                    schema.NGJob.status == 'DELETED')).delete()
+        if old_jobs > 0:
+            self.log.info("Removing %d 'old' jobs from db." % old_jobs) 
+        
+        
  
 
     def main(self):

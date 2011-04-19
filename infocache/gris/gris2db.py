@@ -36,7 +36,6 @@ class Gris2db(object):
     USER_UPDATE_PERIOD = 7200 # periodicity for updating user access lists in DB in seconds
 
     JOB_FIN_STATES = ['LOST',
-                'DELETED',
                 'FIN_DELETED',
                 'FLD_DELETED',
                 'KIL_DELETED',
@@ -96,7 +95,7 @@ class Gris2db(object):
                         session.add(db_job)
                     except: # no handling
                         self.log.error("Job %s could not be inserted in DB." % job.id)
-                elif db_job.status in Gris2db.JOB_FIN_STATES: # case: final db state -> don't update
+                elif db_job.status in Gris2db.JOB_FIN_STATES: # case: final db state -> don't touch
                     pass
                 elif job.status == 'DELETED': 
                     if db_job.status in ['FINISHED','KILLED','FAILED']:
@@ -121,20 +120,27 @@ class Gris2db(object):
                     db_job.db_lastmodified = datetime.utcnow()
                     session.add(db_job)
             
-            # update jobs that got fetched
+            # update db jobs that are not anymore advertized by the Grid infosys
             for db_job in session.query(schema.NGJob).filter(
                 AND(schema.NGJob.cluster_name == gris_url.Host(),
-                OR(schema.NGJob.status == 'FINISHED',
-                    schema.NGJob.status == 'KILLED',
-                    schema.NGJob.status == 'FAILED'))).all():
+                    schema.NGJob.status != 'DELETED',
+                    schema.NGJob.status != 'LOST',
+                    schema.NGJob.status != 'FIN_FETCHED',
+                    schema.NGJob.status != 'FIN_DELETED',
+                    schema.NGJob.status != 'KIL_FETCHED',
+                    schema.NGJob.status != 'KIL_DELETED',
+                    schema.NGJob.status != 'FLD_FETCHED',
+                    schema.NGJob.status != 'FLD_DELETED')).all():
                 if db_job.global_id not in arc_job_ids: # job got fetched
                     if db_job.status == 'FINISHED':
                         db_job.status = 'FIN_FETCHED'
                     elif db_job.status == 'FAILLED':
                         db_job.status = 'FLD_FETCHED'
                     elif db_job.status == 'KILLED':
-                            db_job.status = 'KIL_FETCHED'
-                    db_job.db_lastmodified = datetime.utcnow()
+                        db_job.status = 'KIL_FETCHED'
+                    else:
+                        db_job.status = 'LOST'
+                    #db_job.db_lastmodified = datetime.utcnow()
                     session.add(db_job)
 
             session.commit()

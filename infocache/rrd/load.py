@@ -51,21 +51,22 @@ class GridLoad(object):
             self.log.info("Created RDD database '%s'" % dbname)
     
     def _make_cmd(self, fig_name, start, end, rrd_file, type='queued',grid_cluster_queue_name='Grid'):
+        # XXX -o option for logarithmic graphs fails since update to  debian squeeze ???
         if type == 'queued':
             cmd = "rrdtool graph %s -s %d -e %d --title='Actual queue backlogs on %s' \
-                 DEF:ngqueued=%s:gridqueued:AVERAGE \
-                 DEF:nlqueued=%s:localqueued:AVERAGE \
-                 DEF:npqueued_tmp=%s:prelrmsqueued:AVERAGE \
-                 CDEF:npqueued=npqueued_tmp,ngqueued,- \
-                 VDEF:ngqueued_max=ngqueued,MAXIMUM \
-                 VDEF:ngqueued_avg=ngqueued,AVERAGE \
-                 VDEF:ngqueued_min=ngqueued,MINIMUM \
-                 VDEF:nlqueued_max=nlqueued,MAXIMUM \
-                 VDEF:nlqueued_avg=nlqueued,AVERAGE \
-                 VDEF:nlqueued_min=nlqueued,MINIMUM \
-                 VDEF:npqueued_max=npqueued_tmp,MAXIMUM \
-                 VDEF:npqueued_avg=npqueued_tmp,AVERAGE \
-                 VDEF:npqueued_min=npqueued_tmp,MINIMUM \
+                 DEF:gridq=%s:gridqueued:AVERAGE \
+                 DEF:localq=%s:localqueued:AVERAGE \
+                 DEF:plrmsq_tmp=%s:prelrmsqueued:AVERAGE \
+                 CDEF:plrmsq=plrmsq_tmp,gridq,- \
+                 VDEF:gridq_max=gridq,MAXIMUM \
+                 VDEF:gridq_avg=gridq,AVERAGE \
+                 VDEF:gridq_min=gridq,MINIMUM \
+                 VDEF:localq_max=localq,MAXIMUM \
+                 VDEF:localq_avg=localq,AVERAGE \
+                 VDEF:localq_min=localq,MINIMUM \
+                 VDEF:plrmsq_max=plrmsq_tmp,MAXIMUM \
+                 VDEF:plrmsq_avg=plrmsq_tmp,AVERAGE \
+                 VDEF:plrmsq_min=plrmsq_tmp,MINIMUM \
                  -c BACK#F8F7FF \
                  -c CANVAS#4682B4 \
                  -c SHADEA#F0EDFF \
@@ -75,27 +76,26 @@ class GridLoad(object):
                  -c ARROW#000000 \
                  -c FONT#000000 \
                  -w 800 \
-                 -o \
                  -v \[jobs\] \
                  COMMENT:\"                  \"\
                  COMMENT:\"Minimum  \"\
                  COMMENT:\"Average  \"\
                  COMMENT:\"Maximum  \l\"\
                  COMMENT:\"    \"\
-                 AREA:ngqueued#FF9000:'GRID QUEUED'\
-                 GPRINT:ngqueued_min:\"   %%2.2lf\" \
-                 GPRINT:ngqueued_avg:\"     %%2.2lf\" \
-                 GPRINT:ngqueued_max:\"      %%2.2lf\l\"\
+                 AREA:gridq#FF9000:'GRID QUEUED'\
+                 GPRINT:gridq_min:\"   %%2.2lf\" \
+                 GPRINT:gridq_avg:\"     %%2.2lf\" \
+                 GPRINT:gridq_max:\"      %%2.2lf\l\"\
                  COMMENT:\"    \"\
-                 AREA:npqueued#D9F38E:'PRELRMS QUEUED:STACK'\
-                 GPRINT:npqueued_min:\"   %%2.2lf\" \
-                 GPRINT:npqueued_avg:\"     %%2.2lf\" \
-                 GPRINT:npqueued_max:\"      %%2.2lf\l\"\
+                 AREA:plrmsq#D9F38E:'PRELRMS QUEUED:STACK'\
+                 GPRINT:plrmsq_min:\"   %%2.2lf\" \
+                 GPRINT:plrmsq_avg:\"     %%2.2lf\" \
+                 GPRINT:plrmsq_max:\"      %%2.2lf\l\"\
                  COMMENT:\"    \"\
-                 AREA:nlqueued#CCFFFF:'NON-GRID QUEUED':STACK\
-                 GPRINT:nlqueued_min:\"   %%2.2lf\" \
-                 GPRINT:nlqueued_avg:\"     %%2.2lf\" \
-                 GPRINT:nlqueued_max:\"      %%2.2lf\l\"" % (fig_name, start, end, 
+                 AREA:localq#CCFFFF:'NON-GRID QUEUED':STACK\
+                 GPRINT:localq_min:\"   %%2.2lf\" \
+                 GPRINT:localq_avg:\"     %%2.2lf\" \
+                 GPRINT:localq_max:\"      %%2.2lf\l\"" % (fig_name, start, end, 
                  grid_cluster_queue_name, rrd_file, rrd_file, rrd_file)
         else:
             cmd = "rrdtool graph %s -s %d -e %d --title='Actual load on %s' \
@@ -156,44 +156,44 @@ class GridLoad(object):
         h24_e = time.time()
         h24_s = h24_e - 24 * 3600
         
-        fig24_name = os.path.join(self.plotdir, grid_cluster_queue_name+'stats_qh24.png') # 24 hours plot
+        fig24_name = os.path.join(self.plotdir, grid_cluster_queue_name + 'stats_qh24.png') # 24 hours plot
         cmd = self._make_cmd(fig24_name, h24_s, h24_e, rrd_file, 'queued', grid_cluster_queue_name)
         (code, output) = commands.getstatusoutput(cmd)
         if code != 0:
-            self.log.error( output)
+            self.log.error(output)
         
-        fig24_name = os.path.join(self.plotdir, grid_cluster_queue_name+'stats_ch24.png') # 24 hours plot
+        fig24_name = os.path.join(self.plotdir, grid_cluster_queue_name + 'stats_ch24.png') # 24 hours plot
         cmd = self._make_cmd(fig24_name, h24_s, h24_e, rrd_file, 'cpu', grid_cluster_queue_name)
         (code, output) = commands.getstatusoutput(cmd)
         if code != 0:
-            self.log.error( output)
+            self.log.error(output)
         
         hw1_e = time.time()
         hw1_s = hw1_e - 24 * 3600 * 7 
 
-        figw1_name = os.path.join(self.plotdir, grid_cluster_queue_name+'stats_qw1.png') # 1 week  plot
+        figw1_name = os.path.join(self.plotdir, grid_cluster_queue_name + 'stats_qw1.png') # 1 week  plot
         cmd = self._make_cmd(figw1_name, hw1_s, hw1_e, rrd_file,'queued', grid_cluster_queue_name)
         (code, output) = commands.getstatusoutput(cmd)
         if code != 0:
             self.log.error( output)
         
-        figw1_name = os.path.join(self.plotdir, grid_cluster_queue_name+'stats_cw1.png') # 1 week  plot
-        cmd = self._make_cmd(figw1_name, hw1_s, hw1_e, rrd_file, 'cpu',grid_cluster_queue_name)
+        figw1_name = os.path.join(self.plotdir, grid_cluster_queue_name + 'stats_cw1.png') # 1 week  plot
+        cmd = self._make_cmd(figw1_name, hw1_s, hw1_e, rrd_file, 'cpu', grid_cluster_queue_name)
         (code, output) = commands.getstatusoutput(cmd)
         if code != 0:
-            self.log.error( output)
+            self.log.error(output)
         
         hm12_e = time.time()
         hm12_s = hm12_e - 24 * 3600 * 365
         
-        figm12_name = os.path.join(self.plotdir, grid_cluster_queue_name+'stats_qy1.png') # 1year  plot
+        figm12_name = os.path.join(self.plotdir, grid_cluster_queue_name + 'stats_qy1.png') # 1year  plot
         cmd = self._make_cmd(figm12_name, hm12_s, hm12_e, rrd_file, 'queued',grid_cluster_queue_name)
         (code, output) = commands.getstatusoutput(cmd)
         if code != 0:
-            self.log.error( output)
+            self.log.error(output)
 
-        figm12_name = os.path.join(self.plotdir, grid_cluster_queue_name+'stats_cy1.png') # 1 year  plot
-        cmd = self._make_cmd(figm12_name, hm12_s, hm12_e, rrd_file, 'cpu',grid_cluster_queue_name)
+        figm12_name = os.path.join(self.plotdir, grid_cluster_queue_name + 'stats_cy1.png') # 1 year  plot
+        cmd = self._make_cmd(figm12_name, hm12_s, hm12_e, rrd_file, 'cpu', grid_cluster_queue_name)
         (code, output) = commands.getstatusoutput(cmd)
         if code != 0:
             self.log.error( output)
@@ -223,7 +223,6 @@ class GridLoad(object):
         if not os.path.exists(dbn):
                 self.create_rrd(dbn)
 
-        
         totalcpus = stats.get_attribute('total_cpus')
         usedcpus = stats.get_attribute('used_cpus')
         gridrunning = stats.get_attribute('grid_running')
@@ -235,8 +234,7 @@ class GridLoad(object):
         cmd = 'rrdtool update %s -t\
              totalcpus:usedcpus:gridrunning:running:gridqueued:localqueued:prelrmsqueued \
              %d:%d:%d:%d:%d:%d:%d:%d' \
-             % (dbn,time.time(), totalcpus, usedcpus, gridrunning, running, 
-                gridqueued, localqueued, prelrmsqueued)
+             % (dbn, time.time(), totalcpus, usedcpus, gridrunning, running, gridqueued, localqueued, prelrmsqueued)
 
         (code, output) = commands.getstatusoutput(cmd)
         if code != 0:
