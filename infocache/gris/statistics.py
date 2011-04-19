@@ -13,7 +13,7 @@ from infocache.errors.stats import *
 
 class NGStats(StatsApi):
 
-    QSTATS_ATTRS=['total_cpus','grid_running','grid_queued','local_queued',\
+    QSTATS_ATTRS=['grid_running','grid_queued','local_queued',\
                 'prelrms_queued','running'] # queue attributes
     CSTATS_ATTRS=['total_jobs','used_cpus','total_cpus']  # cluster attributes, appended 
                                                        # to cluster stats
