@@ -22,7 +22,7 @@ class NGJob(object, JobApi):
         sessiondir_erase_time = None,
         errors = 1023,
         execution_nodes = 1023,
-        exitcode = None,
+        exit_code = None,
         gmlog = 511,
         proxy_expiration_time = None,
         queue_rank = None,
@@ -157,6 +157,6 @@ class NGJob(object, JobApi):
         if not attr:
             return []
 
-        if name in NGJobs.PICKLED:
+        if name in NGJob.PICKLED:
             return cPickle.loads(attr)
         return [attr]

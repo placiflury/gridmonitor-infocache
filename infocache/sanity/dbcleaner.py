@@ -71,7 +71,8 @@ class Cleanex(object):
             self.log.info("Removing %d 'DELETED' jobs that got from db." % djobs) 
 
         # 3.) remove 'LOST' records.
-        ljobs = session.query(schema.NGJob).filter(AND(schema.NGJob.completion_time <= fetched_before, 
+        #ljobs = session.query(schema.NGJob).filter(AND(schema.NGJob.completion_time <= fetched_before, 
+        ljobs = session.query(schema.NGJob).filter(AND(schema.NGJob.db_lastmodified <= fetched_before, 
                     schema.NGJob.status == 'LOST')).delete()
         if ljobs > 0:
             self.log.info("Removing %d 'LOST' jobs from db." % ljobs) 

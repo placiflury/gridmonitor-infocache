@@ -15,14 +15,14 @@ from infocache.db import meta, schema
 
 class GrisGiis(object):
 
-    def __init__(self,rrddir, plotdir):
+    def __init__(self, rrddir, plotdir):
         self.log = logging.getLogger(__name__)
         self.rrddir = rrddir
         self.plotdir = plotdir
         self.log.debug("Initialization finished")
         
     
-    def create_rrd(self,dbname):
+    def create_rrd(self, dbname):
         """
         RRA: 24 hours (120 * 720)   with 120 sec resolution
         RRA: 1 week (120 * 15  * 336)  with 30 min resolution
@@ -46,7 +46,7 @@ class GrisGiis(object):
             self.log.info("Created RDD database '%s'" % dbname)
         
 
-    def _make_cmd(self,fig_name,start,end,cluster_name,type,rrd_file):
+    def _make_cmd(self, fig_name, start, end, cluster_name, _type, rrd_file):
         cmd = "rrdtool graph %s -s %d -e %d --title='%s processing times for %s' \
                  DEF:proc=%s:processing_time:AVERAGE \
                  VDEF:proc_max=proc,MAXIMUM \
@@ -65,17 +65,18 @@ class GrisGiis(object):
                  GPRINT:proc_min:'MIN\:'%%2.1lf%%Ss\
                  GPRINT:proc_avg:'AVG\:'%%2.1lf%%Ss\
                  GPRINT:proc_max:'MAX\:'%%2.1lf%%Ss\
-                 AREA:proc#CCFFFF:'Processing Time'" % (fig_name, start, end, type, cluster_name,rrd_file)
+                 AREA:proc#CCFFFF:'Processing Time'" % \
+                    (fig_name, start, end, _type, cluster_name, rrd_file)
         return cmd
 
-    def create_plots(self,cluster_name, type='GRIS'):
+    def create_plots(self,cluster_name, _type='GRIS'):
         
         rrd_file = os.path.join(self.rrddir, cluster_name+'.rrd')
         fig24_name = os.path.join(self.plotdir, cluster_name+'_h24.png') # 24hours plot
         h24_e = time.time()
         h24_s = h24_e - 24 * 3600
 
-        cmd = self._make_cmd(fig24_name,h24_s, h24_e,cluster_name, type, rrd_file)
+        cmd = self._make_cmd(fig24_name, h24_s, h24_e, cluster_name, _type, rrd_file)
         (code,output) = commands.getstatusoutput(cmd)
         if code !=0:
             self.log.error( output)
@@ -84,7 +85,7 @@ class GrisGiis(object):
         hw1_e = time.time()
         hw1_s = hw1_e - 24 * 3600 * 7 
 
-        cmd = self._make_cmd(figw1_name,hw1_s,hw1_e,cluster_name,type,rrd_file)
+        cmd = self._make_cmd(figw1_name, hw1_s, hw1_e, cluster_name,_type,rrd_file)
         (code,output) = commands.getstatusoutput(cmd)
         if code !=0:
             self.log.error( output)
@@ -93,7 +94,7 @@ class GrisGiis(object):
         hy1_e = time.time()
         hy1_s = hy1_e - 24 * 3600 * 365
 
-        cmd = self._make_cmd(figy1_name,hy1_s,hy1_e,cluster_name,type,rrd_file)
+        cmd = self._make_cmd(figy1_name, hy1_s, hy1_e, cluster_name, _type, rrd_file)
         (code,output) = commands.getstatusoutput(cmd)
         if code !=0:
             self.log.error( output)
@@ -168,7 +169,7 @@ class GrisGiis(object):
             else:
                 self.log.debug("UpdatedRDD database '%s'" % dbn)
             
-            self.create_plots(giis.get_hostname(), type='GIIS')
+            self.create_plots(giis.get_hostname(), _type='GIIS')
     
     def generate_plots(self):
         self.gris()

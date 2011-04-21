@@ -10,7 +10,6 @@ import time
 import os.path
 import  commands # XXX change to subprocess
 import cPickle
-from datetime import datetime
 
 from infocache.db import meta, schema
 
@@ -50,9 +49,9 @@ class GridLoad(object):
         else:
             self.log.info("Created RDD database '%s'" % dbname)
     
-    def _make_cmd(self, fig_name, start, end, rrd_file, type='queued',grid_cluster_queue_name='Grid'):
+    def _make_cmd(self, fig_name, start, end, rrd_file, _type='queued', grid_cluster_queue_name='Grid'):
         # XXX -o option for logarithmic graphs fails since update to  debian squeeze ???
-        if type == 'queued':
+        if _type == 'queued':
             cmd = "rrdtool graph %s -s %d -e %d --title='Actual queue backlogs on %s' \
                  DEF:gridq=%s:gridqueued:AVERAGE \
                  DEF:localq=%s:localqueued:AVERAGE \
@@ -172,7 +171,7 @@ class GridLoad(object):
         hw1_s = hw1_e - 24 * 3600 * 7 
 
         figw1_name = os.path.join(self.plotdir, grid_cluster_queue_name + 'stats_qw1.png') # 1 week  plot
-        cmd = self._make_cmd(figw1_name, hw1_s, hw1_e, rrd_file,'queued', grid_cluster_queue_name)
+        cmd = self._make_cmd(figw1_name, hw1_s, hw1_e, rrd_file, 'queued', grid_cluster_queue_name)
         (code, output) = commands.getstatusoutput(cmd)
         if code != 0:
             self.log.error( output)
@@ -187,7 +186,7 @@ class GridLoad(object):
         hm12_s = hm12_e - 24 * 3600 * 365
         
         figm12_name = os.path.join(self.plotdir, grid_cluster_queue_name + 'stats_qy1.png') # 1year  plot
-        cmd = self._make_cmd(figm12_name, hm12_s, hm12_e, rrd_file, 'queued',grid_cluster_queue_name)
+        cmd = self._make_cmd(figm12_name, hm12_s, hm12_e, rrd_file, 'queued', grid_cluster_queue_name)
         (code, output) = commands.getstatusoutput(cmd)
         if code != 0:
             self.log.error(output)
@@ -209,15 +208,22 @@ class GridLoad(object):
         gstats = cPickle.loads(stats.pickle_object)      
         #grid_name = gstats.get_name()
         grid_name = 'Grid' # using this instead of grid-name
-        self._statistics(grid_name, gstats)
+        
+        dt = stats.db_lastmodified 
+        t_epoch = time.mktime(dt.timetuple()) + \
+             dt.microsecond/1000000.0 - time.timezone # datetime does not care about microsecs
+        
+        self._statistics(grid_name, gstats, t_epoch)
 
         for cluster in gstats.get_children():
             cluster_name = cluster.get_name()
-            # XXX do same for queues ... if desired/requested
-            self._statistics(cluster_name, cluster)
+            self._statistics(cluster_name, cluster, t_epoch)
 
 
-    def _statistics(self, name, stats):
+    def _statistics(self, name, stats, t_epoch = None):
+
+        if not t_epoch:
+            t_epoch = time.time()
 
         dbn = os.path.join(self.rrddir, name+'.rrd')
         if not os.path.exists(dbn):
@@ -234,7 +240,8 @@ class GridLoad(object):
         cmd = 'rrdtool update %s -t\
              totalcpus:usedcpus:gridrunning:running:gridqueued:localqueued:prelrmsqueued \
              %d:%d:%d:%d:%d:%d:%d:%d' \
-             % (dbn, time.time(), totalcpus, usedcpus, gridrunning, running, gridqueued, localqueued, prelrmsqueued)
+             % (dbn, t_epoch, totalcpus, usedcpus, gridrunning, 
+                    running, gridqueued, localqueued, prelrmsqueued)
 
         (code, output) = commands.getstatusoutput(cmd)
         if code != 0:

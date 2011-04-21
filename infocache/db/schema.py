@@ -88,11 +88,9 @@ t_queue = sa.Table('queue', meta.metadata,
         sa.Column('prelrms_queued',sa.types.Integer, default=0),
         sa.Column('queued',sa.types.Integer, default=0),
         sa.Column('running',sa.types.Integer, default=0),
-        sa.Column('total_cpus',sa.types.Integer, default=0),
+        sa.Column('cpus',sa.types.Integer, default=0),
         sa.Column('scheduling_policy',sa.types.VARCHAR(63))
 )
-
-
 
 t_job = sa.Table("job",meta.metadata,
         sa.Column("global_id", sa.types.VARCHAR(255), primary_key=True),
@@ -176,7 +174,15 @@ class GridStats(object):
 
 mapper(GridStats, t_gridstats)
 mapper(GiisMeta, t_giis)
-mapper(NGJob, t_job)
+# mapper(NGJob, t_job)
+
+mapper(NGJob,t_job,
+        properties=dict(access=relationship(UserAccess,
+        foreign_keys=[t_job.c.global_owner],
+        primaryjoin=(sa.and_(t_job.c.global_owner == t_user_access.c.user,
+                    t_job.c.cluster_name == t_user_access.c.hostname,
+                    t_job.c.queue_name == t_user_access.c.queuename))))
+)
 
 """
 mapper(NGJob,t_job,

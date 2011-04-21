@@ -33,7 +33,7 @@ class NGQueue(object, QueueApi):
         running = None,
         scheduling_policy = 63,
         status = 127,
-        total_cpus = None)
+        cpus = None)
     
     def __add_attribute(self, name, value):
         """ Adds a new attribute with 'name' to the class and 
@@ -88,7 +88,7 @@ class NGQueue(object, QueueApi):
         self.__add_attribute('running', qi.running)
         self.__add_attribute('scheduling_policy', qi.scheduling_policy)
         self.__add_attribute('status', qi.status)
-        self.__add_attribute('total_cpus', qi.total_cpus)
+        self.__add_attribute('cpus', qi.total_cpus) # notice re-named
 
     def get_name(self):
         return self.get_attribute_values('name')[0]

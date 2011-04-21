@@ -36,13 +36,15 @@ class GiisMeta(object):
         """ Updates status of cluster/GRIS """
         self.status = status
 
-    def set_db_lastmodified(self, utc_time=datetime.utcnow()):
+    def set_db_lastmodified(self, utc_time= None):
         """ Updates db_lastmodified_time either to
             specified time or to utc now (if no
             time has been specified.
 
             utc_time -- dateteime object
         """
+        if not utc_time:
+            utc_time = datetime.utcnow()
         self.db_lastmodified = utc_time
 
     def set_response_time(self, t):

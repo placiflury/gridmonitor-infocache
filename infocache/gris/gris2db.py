@@ -85,16 +85,18 @@ class Gris2db(object):
             arc_jobs = GetClusterJobs(gris_url)
             arc_job_ids = list()            
 
-            # get jobs from db for that cluster
             for job in arc_jobs:
+                try:
+                    _new_db_job = schema.NGJob(job) # easiest way to update all job entries in db 
+                except: # no handling
+                    self.log.error("Job %s will be ingored as it will not fit in db schema." % job.id)
+
                 arc_job_ids.append(job.id)
+                
                 db_job = session.query(schema.NGJob).filter_by(global_id=job.id).first()
+
                 if not db_job: # case: new job
-                    try:
-                        db_job = schema.NGJob(job)
-                        session.add(db_job)
-                    except: # no handling
-                        self.log.error("Job %s could not be inserted in DB." % job.id)
+                    session.add(_new_db_job)
                 elif db_job.status in Gris2db.JOB_FIN_STATES: # case: final db state -> don't touch
                     pass
                 elif job.status == 'DELETED': 
@@ -105,20 +107,16 @@ class Gris2db(object):
                         else:
                             suffix = '_FETCHED'
                         if db_job.status == 'FINISHED':
-                            db_job.status = 'FIN_' + suffix
+                            _new_db_job.status = 'FIN_' + suffix
                         elif db_job.status == 'FAILLED':
-                            db_job.status = 'FLD_' + suffix
+                            _new_db_job.status = 'FLD_' + suffix
                         elif db_job.status == 'KILLED':
-                            db_job.status = 'KIL_' + suffix
+                            _new_db_job.status = 'KIL_' + suffix
                     else: # not in any final state
-                        db_job.status = 'LOST'
-                    
-                    db_job.db_lastmodified = datetime.utcnow()
-                    session.add(db_job)
+                        _new_db_job.status = 'LOST'
+                    session.merge(_new_db_job)
                 else: # case db_job non-final, arc_job not DELETED -> upate to new state
-                    db_job.status = job.status
-                    db_job.db_lastmodified = datetime.utcnow()
-                    session.add(db_job)
+                    session.merge(_new_db_job)
             
             # update db jobs that are not anymore advertized by the Grid infosys
             for db_job in session.query(schema.NGJob).filter(

@@ -115,12 +115,14 @@ class Giis2db(Daemon):
             if giis:
                 self.log.debug("got GIIS")
                 giis.blacklisting()
+                giis.set_db_lastmodified()
                 session.add(giis)
             else:
                 self.log.debug("Did not exist in DB.... skipping")
 
         for giis in session.query(schema.GiisMeta).filter(schema.GiisMeta.db_lastmodified <  timestamp):
             giis.set_status('inactive')
+            db_giis.set_db_lastmodified()
             session.add(giis)
 
         session.commit()
@@ -142,6 +144,7 @@ class Giis2db(Daemon):
             proc_time = time.time() - timestamp
             self.log.debug("Query of GIIS for GRIS URLs took %s seconds" % proc_time)
             db_giis.set_processing_time(proc_time)
+            db_giis.set_db_lastmodified()
             session.add(db_giis)
             for gris_url in  gris_urls:
                 if gris_url not in self.gris_list:

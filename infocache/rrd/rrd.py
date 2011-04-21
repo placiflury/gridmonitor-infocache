@@ -22,7 +22,6 @@ class RRD(object):
         self.log = logging.getLogger(__name__)
         self.log.debug("Checking whether rrddir exits: %s" % rrddir)
         self._check_create_dir(rrddir)
-        self.log.debug("you")
 
         ldir = os.path.join(rrddir, 'load')
         self.log.debug("Checking whether rrddir2 exits: %s" % ldir)

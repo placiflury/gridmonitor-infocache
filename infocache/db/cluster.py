@@ -102,7 +102,7 @@ class NGCluster(ClusterApi, ClusterMeta):
         contact =  511,
         location =  255,
         issuer_ca =  255,
-        cert_expriation =  63,
+        cert_expiration =  63,
         architecture =  255,
         homogeneity =  None,
         node_cpu =  255,
