@@ -147,7 +147,7 @@ class Jobs(object):
         lost_jobs = session.query(schema.NGJob).filter(AND(schema.NGJob.completion_time > t_s,
             schema.NGJob.completion_time <= t_e, schema.NGJob.status == 'LOST')).all()
         nlost, wlost = self._get_num_walltime(lost_jobs)
-
+        self.log.debug("JOB-time: %s" % datetime.utcfromtimestamp(t_e_epoch))
         self.log.debug("JOBS: faild: %d (%d) killd: %d (%d) finishd %d (%d), deletd: %d (%d), lost: %d (%d)"
              % (nfailed, wfailed, nkilled, wkilled, nfinished, wfinished, ndeleted, wdeleted,nlost,wlost))
         
@@ -173,9 +173,9 @@ class Jobs(object):
         self.final_jobs()
         
 
-    def _make_cmd(self, fig_name, start, end, rrd_file, type='num_jobs'):
+    def _make_cmd(self, fig_name, start, end, rrd_file, _type='num_jobs'):
    
-        if type== 'num_jobs':
+        if _type== 'num_jobs':
             cmd = "rrdtool graph %s -s %d -e %d --title='Number of Grid jobs in final states' \
                  DEF:nfined=%s:finished:AVERAGE \
                  DEF:nkilled=%s:killed:AVERAGE \
@@ -270,7 +270,6 @@ class Jobs(object):
                  -c FONT#000000 \
                  -w 800  \
                  -v \[min\] \
-                 -o \
                  COMMENT:\"                  \"\
                  COMMENT:\"Minimum  \"\
                  COMMENT:\"Average  \"\
@@ -307,7 +306,7 @@ class Jobs(object):
 
     def create_plots(self):
         
-        rrd_file = os.path.join(self.rrddir,Jobs.FINAL_JOBS_RRD)
+        rrd_file = os.path.join(self.rrddir, Jobs.FINAL_JOBS_RRD)
         h24_e = time.time()
         h24_s = h24_e - 24 * 3600
         
@@ -318,9 +317,9 @@ class Jobs(object):
             self.log.error( output)
         
         fig24_name = os.path.join(self.plotdir, Jobs.FINAL_JOBS_RRD[:-4] + 'wj_h24.png') # 24hours plot
-        cmd = self._make_cmd(fig24_name, h24_s, h24_e, rrd_file, type='walltime')
+        cmd = self._make_cmd(fig24_name, h24_s, h24_e, rrd_file, _type='walltime')
         (code, output) = commands.getstatusoutput(cmd)
-        if code !=0:
+        if code != 0:
             self.log.error( output)
         
         hw1_e = time.time()
@@ -329,13 +328,13 @@ class Jobs(object):
         figw1_name = os.path.join(self.plotdir, Jobs.FINAL_JOBS_RRD[:-4] + 'nj_w1.png') 
         cmd = self._make_cmd(figw1_name, hw1_s, hw1_e, rrd_file)
         (code, output) = commands.getstatusoutput(cmd)
-        if code !=0:
+        if code != 0:
             self.log.error( output)
         
         figw1_name = os.path.join(self.plotdir, Jobs.FINAL_JOBS_RRD[:-4] + 'wj_w1.png')
-        cmd = self._make_cmd(figw1_name, hw1_s, hw1_e, rrd_file, type='walltime')
+        cmd = self._make_cmd(figw1_name, hw1_s, hw1_e, rrd_file, _type='walltime')
         (code, output) = commands.getstatusoutput(cmd)
-        if code !=0:
+        if code != 0:
             self.log.error( output)
         
         hy1_e = time.time()
@@ -344,13 +343,13 @@ class Jobs(object):
         figy1_name = os.path.join(self.plotdir, Jobs.FINAL_JOBS_RRD[:-4] + 'nj_y1.png') # one year  plot
         cmd = self._make_cmd(figy1_name, hy1_s, hy1_e,  rrd_file)
         (code, output) = commands.getstatusoutput(cmd)
-        if code !=0:
+        if code != 0:
             self.log.error( output)
 
         figy1_name = os.path.join(self.plotdir, Jobs.FINAL_JOBS_RRD[:-4] + 'wj_y1.png') # one year  plot
-        cmd = self._make_cmd(figy1_name, hy1_s, hy1_e,  rrd_file, type='walltime')
+        cmd = self._make_cmd(figy1_name, hy1_s, hy1_e,  rrd_file, _type='walltime')
         (code, output) = commands.getstatusoutput(cmd)
-        if code !=0:
+        if code != 0:
             self.log.error( output)
 
  

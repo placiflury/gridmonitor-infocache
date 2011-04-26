@@ -37,10 +37,10 @@ class GrisGiis(object):
          RRA:AVERAGE:0.5:360:365\
          RRA:MAX:0.5:1:720\
          RRA:MAX:0.5:15:336:\
-         RRA:MAX:0.5:360:365" %  (dbname,now) 
+         RRA:MAX:0.5:360:365" %  (dbname, now) 
 
-        (code,output) = commands.getstatusoutput(cmd)
-        if code !=0:
+        (code, output) = commands.getstatusoutput(cmd)
+        if code != 0:
             self.log.error( output)
         else:
             self.log.info("Created RDD database '%s'" % dbname)
@@ -69,7 +69,7 @@ class GrisGiis(object):
                     (fig_name, start, end, _type, cluster_name, rrd_file)
         return cmd
 
-    def create_plots(self,cluster_name, _type='GRIS'):
+    def create_plots(self, cluster_name, _type='GRIS'):
         
         rrd_file = os.path.join(self.rrddir, cluster_name+'.rrd')
         fig24_name = os.path.join(self.plotdir, cluster_name+'_h24.png') # 24hours plot
@@ -77,26 +77,26 @@ class GrisGiis(object):
         h24_s = h24_e - 24 * 3600
 
         cmd = self._make_cmd(fig24_name, h24_s, h24_e, cluster_name, _type, rrd_file)
-        (code,output) = commands.getstatusoutput(cmd)
-        if code !=0:
+        (code, output) = commands.getstatusoutput(cmd)
+        if code != 0:
             self.log.error( output)
         
         figw1_name = os.path.join(self.plotdir, cluster_name+'_w1.png') # 1 week  plot
         hw1_e = time.time()
         hw1_s = hw1_e - 24 * 3600 * 7 
 
-        cmd = self._make_cmd(figw1_name, hw1_s, hw1_e, cluster_name,_type,rrd_file)
-        (code,output) = commands.getstatusoutput(cmd)
-        if code !=0:
+        cmd = self._make_cmd(figw1_name, hw1_s, hw1_e, cluster_name, _type, rrd_file)
+        (code, output) = commands.getstatusoutput(cmd)
+        if code != 0:
             self.log.error( output)
         
-        figy1_name = os.path.join(self.plotdir,cluster_name+'_y1.png') # 1 year  plot
+        figy1_name = os.path.join(self.plotdir, cluster_name+'_y1.png') # 1 year  plot
         hy1_e = time.time()
         hy1_s = hy1_e - 24 * 3600 * 365
 
         cmd = self._make_cmd(figy1_name, hy1_s, hy1_e, cluster_name, _type, rrd_file)
-        (code,output) = commands.getstatusoutput(cmd)
-        if code !=0:
+        (code, output) = commands.getstatusoutput(cmd)
+        if code != 0:
             self.log.error( output)
 
  
@@ -113,7 +113,7 @@ class GrisGiis(object):
         
         for cluster in session.query(schema.NGCluster).all():
             # check whether rrd db exists 
-            dbn = os.path.join(self.rrddir,cluster.hostname+'.rrd')
+            dbn = os.path.join(self.rrddir, cluster.hostname+'.rrd')
             if not os.path.exists(dbn):
                 self.create_rrd(dbn) 
 
@@ -163,7 +163,7 @@ class GrisGiis(object):
             cmd = 'rrdtool update %s -t response_time:processing_time %d:%f:%f' \
                 % (dbn, t_epoch, response_time, processing_time)
          
-            (code,output) = commands.getstatusoutput(cmd)
+            (code, output) = commands.getstatusoutput(cmd)
             if code !=0:
                 self.log.error( output)
             else:

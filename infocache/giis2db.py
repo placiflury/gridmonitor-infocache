@@ -122,7 +122,7 @@ class Giis2db(Daemon):
 
         for giis in session.query(schema.GiisMeta).filter(schema.GiisMeta.db_lastmodified <  timestamp):
             giis.set_status('inactive')
-            db_giis.set_db_lastmodified()
+            giis.set_db_lastmodified()
             session.add(giis)
 
         session.commit()
@@ -155,24 +155,26 @@ class Giis2db(Daemon):
         self.gris2db.start() 
         cycle = 1
         while True:
-            self.log.info("New cycle run.")
-            cycle -= 1
-            timestamp = time.time()
-            if cycle <= 1:
-                cycle = Giis2db.GIIS_REFRESH_PERIOD
-                self._refresh_giis_list() 
-            self.log.debug("Using GIIS list")
-            self._refresh_gris_list()            
-            self.log.debug("GRIS list refreshed")
-            self.gris2db.add_urls2queue(self.gris_list)
-            self.log.debug("Refreshed GRISes list")
-            
-            proctime = time.time() - timestamp
-            self.log.info("Current run took  %s seconds" % proctime)
+            try:
+                self.log.info("New cycle run.")
+                cycle -= 1
+                timestamp = time.time()
+                if cycle <= 1:
+                    cycle = Giis2db.GIIS_REFRESH_PERIOD
+                    self._refresh_giis_list() 
+                self.log.debug("Using GIIS list")
+                self._refresh_gris_list()            
+                self.log.debug("GRIS list refreshed")
+                self.gris2db.add_urls2queue(self.gris_list)
+                self.log.debug("Refreshed GRISes list")
+                
+                proctime = time.time() - timestamp
+                self.log.info("Current run took  %s seconds" % proctime)
 
-            if proctime > self.periodicity:
-                continue
-            else:
-                time.sleep(self.periodicity - proctime)
+                if proctime > self.periodicity:
+                    continue
+                else:
+                    time.sleep(self.periodicity - proctime)
 
-
+            except Exception, e:
+                self.log.error("RUN-loop: Got exception %r", e)

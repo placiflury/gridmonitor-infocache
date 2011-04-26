@@ -51,15 +51,18 @@ class Housekeeper(Daemon):
 
     def run(self):
         while True:
-            timestamp = time.time()
-            self.rrd.generate_plots()
-            self.cleaner.main()
-            
-            proctime = time.time() - timestamp
-            self.log.debug("Housekeepr Current run took  %s seconds" % proctime)
-            if proctime > Housekeeper.RRD_PERIODICITY:
-                continue
-            else:
-                time.sleep(Housekeeper.RRD_PERIODICITY - proctime)
+            try:
+                timestamp = time.time()
+                self.rrd.generate_plots()
+                self.cleaner.main()
+                
+                proctime = time.time() - timestamp
+                self.log.debug("Housekeeper current run took  %s seconds" % proctime)
+                if proctime > Housekeeper.RRD_PERIODICITY:
+                    continue
+                else:
+                    time.sleep(Housekeeper.RRD_PERIODICITY - proctime)
 
+            except Exception, e:
+                self.log.error("RUN-loop: Got exception %r", e)
 

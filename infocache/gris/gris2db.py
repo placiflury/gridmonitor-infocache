@@ -17,7 +17,6 @@ import Queue
 from  threading import Lock, Thread
 from datetime import datetime
 from sqlalchemy import and_ as AND
-from sqlalchemy import or_ as OR
 
 from arclib import GetClusterInfo
 from arclib import GetClusterJobs
