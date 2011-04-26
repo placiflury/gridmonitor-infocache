@@ -176,12 +176,17 @@ class Jobs(object):
     def _make_cmd(self, fig_name, start, end, rrd_file, _type='num_jobs'):
    
         if _type== 'num_jobs':
-            cmd = "rrdtool graph %s -s %d -e %d --title='Number of Grid jobs in final states' \
-                 DEF:nfined=%s:finished:AVERAGE \
-                 DEF:nkilled=%s:killed:AVERAGE \
-                 DEF:nfailed=%s:failed:AVERAGE \
-                 DEF:ndeleted=%s:deleted:AVERAGE \
-                 DEF:nlost=%s:lost:AVERAGE \
+            cmd = "rrdtool graph %s -s %d -e %d --title='Number of Grid jobs per minute  in final states' \
+                 DEF:n2fined=%s:finished:AVERAGE \
+                 DEF:n2killed=%s:killed:AVERAGE \
+                 DEF:n2failed=%s:failed:AVERAGE \
+                 DEF:n2deleted=%s:deleted:AVERAGE \
+                 DEF:n2lost=%s:lost:AVERAGE \
+                 CDEF:nfined=n2fined,0.5,\* \
+                 CDEF:nkilled=n2killed,0.5,\* \
+                 CDEF:nfailed=n2failed,0.5,\* \
+                 CDEF:ndeleted=n2deleted,0.5,\* \
+                 CDEF:nlost=n2lost,0.5,\* \
                  VDEF:nfined_max=nfined,MAXIMUM \
                  VDEF:nfined_avg=nfined,AVERAGE \
                  VDEF:nfined_min=nfined,MINIMUM \

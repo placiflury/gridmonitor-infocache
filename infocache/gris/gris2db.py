@@ -31,7 +31,7 @@ from access import ClusterAccess
 class Gris2db(object):
     
     THREAD_LIMIT = 18       # number of GRIS'es that will be queried in parallel
-    BLACK_COUNTER = 10      # number of query cylces a cluster is blacklisted
+    BLACK_COUNTER = 5      # number of query cylces a cluster is blacklisted
     USER_UPDATE_PERIOD = 7200 # periodicity for updating user access lists in DB in seconds
 
     JOB_FIN_STATES = ['LOST',
@@ -57,18 +57,33 @@ class Gris2db(object):
         self.log.debug("Initialization finished")
 
 
-    def _add_cluster2blacklist(self, hostname):
-        """ black-lists a cluster. A cluster is
-            only blacklisted on unexpected behavior (that's 
-            different from setting the status to 'inactive'.
-         """
+    def _is_cluster_blacklisted(self, hostname):
+        """ check whether cluster is blacklisted. If
+            so blacklist-counter will be decreased
+
+            returns True - if blacklisted.
+                    False - else
+        """
+        blacklisted = False
+
         self.block.acquire()
         if self.blacklist.has_key(hostname):
             if self.blacklist[hostname] == 0:
                 self.blacklist.pop(hostname) 
             else:
                 self.blacklist[hostname] -= 1
-        else: 
+                blacklisted = True
+        self.block.release()
+        return blacklisted 
+
+
+    def _add_cluster2blacklist(self, hostname):
+        """ black-lists a cluster. A cluster is
+            only blacklisted on unexpected behavior (that's 
+            different from setting the status to 'inactive'.
+         """
+        self.block.acquire()
+        if not self.blacklist.has_key(hostname):
             self.blacklist[hostname] = Gris2db.BLACK_COUNTER
         self.block.release()
         self.log.warn('Cluster %s has been blacklisted' % hostname)
@@ -154,41 +169,46 @@ class Gris2db(object):
 
     def _cache_cluster_info(self, gris_url):
         """ 'thread-save' """
-        session = meta.Session() 
-        try:
-            timestamp = time.time()
-            arc_cluster = GetClusterInfo(gris_url)
-            arc_queues = arc_cluster.queues
+        if not self._is_cluster_blacklisted(gris_url.Host()):
+            session = meta.Session() 
+            try:
 
-            cl_meta = ClusterMeta()
-            cl_meta.set_response_time(time.time() - timestamp)
-            cl_meta.set_processing_time(self._cache_jobs(gris_url))
-            cl_meta.whitelisting()
-        
-       
-            db_cluster = schema.NGCluster(arc_cluster)
-            self.log.debug("Updading cluster: %s" % db_cluster.get_name())
-            db_cluster.set_metadata(cl_meta)
-            db_cluster = session.merge(db_cluster)
- 
-            for q in arc_queues:
-                db_queue = schema.NGQueue(q, arc_cluster.hostname)
-                db_queue.db_lastmodified = datetime.utcnow()
-                db_queue = session.merge(db_queue)
-            
-            session.commit()
+                hostname = gris_url.Host()
+                    
 
-        except Input_Error, er:
-            self.log.error("Could not insert cluster %s into db, got %s. Rolling back" % \
-                    (gris_url, er.message))
-            session.rollback() 
-            self._add_cluster2blacklist(arc_cluster.hostname)
-        except Exception, er2:
-            self.log.error("Could not insert cluster %s into db, got %r. Rolling back" % \
-                    (gris_url.Host(), er2))
+                timestamp = time.time()
+                arc_cluster = GetClusterInfo(gris_url)
+                arc_queues = arc_cluster.queues
+
+                cl_meta = ClusterMeta()
+                cl_meta.set_response_time(time.time() - timestamp)
+                cl_meta.set_processing_time(self._cache_jobs(gris_url))
+                cl_meta.whitelisting()
             
-            self._add_cluster2blacklist(arc_cluster.hostname)
-            session.rollback() 
+           
+                db_cluster = schema.NGCluster(arc_cluster)
+                self.log.debug("Updading cluster: %s" % db_cluster.get_name())
+                db_cluster.set_metadata(cl_meta)
+                db_cluster = session.merge(db_cluster)
+     
+                for q in arc_queues:
+                    db_queue = schema.NGQueue(q, arc_cluster.hostname)
+                    db_queue.db_lastmodified = datetime.utcnow()
+                    db_queue = session.merge(db_queue)
+                
+                session.commit()
+
+            except Input_Error, er:
+                self.log.error("Could not insert cluster %s into db, got %s. Rolling back" % \
+                        (gris_url, er.message))
+                session.rollback() 
+                self._add_cluster2blacklist(arc_cluster.hostname)
+            except Exception, er2:
+                self.log.error("Could not insert cluster %s into db, got %r. Rolling back" % \
+                        (gris_url.Host(), er2))
+                
+                self._add_cluster2blacklist(arc_cluster.hostname)
+                session.rollback() 
                  
     def _query_grises(self):
         """
@@ -218,7 +238,7 @@ class Gris2db(object):
         blacklisted = self.blacklist.keys()
         self.block.release()
         
-        self.log.debug("%r" % blacklisted)
+        self.log.debug("BLACKLISTED: %r" % blacklisted)
 
         session = meta.Session()
         change = False
@@ -236,7 +256,7 @@ class Gris2db(object):
                 self.log.info("Removing users from cluster access list")
                 session.query(schema.UserAccess).filter_by(hostname=cluster.hostname).delete(synchronize='fetch')
 
-            if blacklisted and (cluster.hostname in blacklisted):
+            if cluster.hostname in blacklisted:
                 cluster.blacklisted = True
                 change = True
                 session.add(cluster)

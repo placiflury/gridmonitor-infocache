@@ -65,4 +65,4 @@ class Housekeeper(Daemon):
 
             except Exception, e:
                 self.log.error("RUN-loop: Got exception %r", e)
-
+                time.sleep(Housekeeper.RRD_PERIODICITY)
