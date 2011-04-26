@@ -113,9 +113,9 @@ class DaemonFactory(object):
         try:
             engine = engine_from_config(config_parser.config.get(),'sqlalchemy_infocache.')
             init_model(engine)
-            self.log.info("Session object to local database created")
+            self.log.info("Session object to local/remote database created")
         except Exception, ex:
-            self.log.error("Session object to local database failed: %r", ex)
+            self.log.error("Session object to local/remote database failed: %r", ex)
 
         daemon_instances = list()
         for d in d_types.split(','):
