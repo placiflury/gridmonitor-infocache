@@ -254,8 +254,8 @@ class Gris2db(object):
                 self.log.info("Deactivating cluster %s" % cluster.hostname)
                 session.add(cluster)
                 self.log.info("Removing users from cluster access list")
-                session.query(schema.UserAccess).filter_by(hostname=cluster.hostname).delete(synchronize='fetch')
-
+                session.query(schema.UserAccess).filter_by(hostname=cluster.hostname).\
+                    delete(synchronize_session='fetch')
             if cluster.hostname in blacklisted:
                 cluster.blacklisted = True
                 change = True

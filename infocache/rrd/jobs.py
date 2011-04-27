@@ -245,11 +245,16 @@ class Jobs(object):
                     rrd_file, rrd_file, rrd_file, rrd_file)
         else:
             cmd  = "rrdtool graph %s -s %d -e %d --title='Walltime of Grid jobs in final states' \
-                 DEF:wfined=%s:finished_walltime:AVERAGE \
-                 DEF:wkilled=%s:killed_walltime:AVERAGE \
-                 DEF:wfailed=%s:failed_walltime:AVERAGE \
-                 DEF:wdeleted=%s:deleted_walltime:AVERAGE \
-                 DEF:wlost=%s:lost_walltime:AVERAGE \
+                 DEF:w2fined=%s:finished_walltime:AVERAGE \
+                 DEF:w2killed=%s:killed_walltime:AVERAGE \
+                 DEF:w2failed=%s:failed_walltime:AVERAGE \
+                 DEF:w2deleted=%s:deleted_walltime:AVERAGE \
+                 DEF:w2lost=%s:lost_walltime:AVERAGE \
+                 CDEF:wfined=w2fined,60,/ \
+                 CDEF:wkilled=w2killed,60,/ \
+                 CDEF:wfailed=w2failed,60,/ \
+                 CDEF:wdeleted=w2deleted, 60,/ \
+                 CDEF:wlost=w2lost,60,/ \
                  VDEF:wfined_max=wfined,MAXIMUM \
                  VDEF:wfined_avg=wfined,AVERAGE \
                  VDEF:wfined_min=wfined,MINIMUM \
