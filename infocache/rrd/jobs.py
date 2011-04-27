@@ -250,11 +250,11 @@ class Jobs(object):
                  DEF:w2failed=%s:failed_walltime:AVERAGE \
                  DEF:w2deleted=%s:deleted_walltime:AVERAGE \
                  DEF:w2lost=%s:lost_walltime:AVERAGE \
-                 CDEF:wfined=w2fined,60,/ \
-                 CDEF:wkilled=w2killed,60,/ \
-                 CDEF:wfailed=w2failed,60,/ \
-                 CDEF:wdeleted=w2deleted, 60,/ \
-                 CDEF:wlost=w2lost,60,/ \
+                 CDEF:wfined=w2fined,60,\/ \
+                 CDEF:wkilled=w2killed,60,\/ \
+                 CDEF:wfailed=w2failed,60,\/ \
+                 CDEF:wdeleted=w2deleted,60,\/ \
+                 CDEF:wlost=w2lost,60,\/ \
                  VDEF:wfined_max=wfined,MAXIMUM \
                  VDEF:wfined_avg=wfined,AVERAGE \
                  VDEF:wfined_min=wfined,MINIMUM \
