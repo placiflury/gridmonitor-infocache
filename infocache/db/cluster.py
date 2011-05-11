@@ -222,7 +222,11 @@ class NGCluster(ClusterApi, ClusterMeta):
         return self.get_attribute_values('hostname')[0]
 
     def get_alias(self):
-        return self.get_attribute_values('alias')[0]
+        aliases = self.get_attribute_values('alias')
+        if aliases:
+            return aliases[0]
+        else:
+            return self.get_attribute_values('hostname')[0]
         
     def get_attribute_names(self):
         return NGCluster.ATTRIBUTES.keys()

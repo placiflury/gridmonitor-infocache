@@ -135,7 +135,10 @@ class NGJob(object, JobApi):
         return self.get_attribute_values('job_name')[0]
 
     def get_exitcode(self):
-        return self.get_attribute_values('exit_code')[0]
+        code = self.get_attribute_values('exit_code')
+        if code:
+            return code[0]
+        return None
     
     def get_cluster_name(self):
         return self.get_attribute_values('cluster_name')[0]

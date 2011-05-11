@@ -131,7 +131,7 @@ class GrisGiis(object):
                 % (dbn, t_epoch, response_time, processing_time)
          
             (code,output) = commands.getstatusoutput(cmd)
-            if code !=0:
+            if code != 0:
                 self.log.error( output)
             else:
                 self.log.debug("UpdatedRDD database '%s'" % dbn)
