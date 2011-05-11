@@ -104,6 +104,7 @@ class Gris2db(object):
                     _new_db_job = schema.NGJob(job) # easiest way to update all job entries in db 
                 except: # no handling
                     self.log.error("Job %s will be ingored as it will not fit in db schema." % job.id)
+                    continue
 
                 arc_job_ids.append(job.id)
                 
@@ -112,7 +113,7 @@ class Gris2db(object):
                 if not db_job: # case: new job
                     session.add(_new_db_job)
                 elif db_job.status in Gris2db.JOB_FIN_STATES: # case: final db state -> don't touch
-                    pass
+                    continue
                 elif job.status == 'DELETED': 
                     if db_job.status in ['FINISHED','KILLED','FAILED']:
                         if (db_job.sessiondir_erase_time >= datetime.utcfromtimestamp(0)) and \
@@ -154,7 +155,7 @@ class Gris2db(object):
                         db_job.status = 'LOST'
                     #db_job.db_lastmodified = datetime.utcnow()
                     session.add(db_job)
-
+                
             session.commit()
         except Input_Error, er:
             self.log.error("Could not insert jobs for cluster %s into db, got %s. Rolling back" % \
