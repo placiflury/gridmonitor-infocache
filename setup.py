@@ -23,8 +23,8 @@ setup(
     author_email = "grid@switch.ch",
     url = "http://www.smscg.ch",
     download_url = "https://subversion.switch.ch/svn/smscg/smscg/ch.smscg.infocache",
-    packages = ['infocache','infocache/db', 'infocache/gris',
-                'infocache/errors', 'infocache/utils'],
+    packages = ['infocache','infocache/db', 'infocache/gris', 'infocache/sanity',
+                'infocache/errors', 'infocache/utils', 'infocache/rrd'],
     scripts = ['infocacher.py'],
     data_files=[('.',['config/config.ini','config/logging.conf'])]
 )
