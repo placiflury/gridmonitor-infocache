@@ -10,9 +10,6 @@ __version__ = "0.3.0"
 
 import sys
 import logging
-from sqlalchemy import engine_from_config
-
-from db import init_model
 from utils import init_config
 import utils.config_parser as config_parser
 
@@ -108,7 +105,8 @@ class DaemonFactory(object):
             
             kwargs['rrd_dir'] = rrd_dir
             kwargs['plot_dir'] = plot_dir
-        
+
+        """        
         # initialize db session before instantiating daemons
         try:
             engine = engine_from_config(config_parser.config.get(),'sqlalchemy_infocache.')
@@ -116,6 +114,7 @@ class DaemonFactory(object):
             self.log.info("Session object to local/remote database created")
         except Exception, ex:
             self.log.error("Session object to local/remote database failed: %r", ex)
+        """
 
         daemon_instances = list()
         for d in d_types.split(','):

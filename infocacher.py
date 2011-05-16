@@ -15,8 +15,11 @@ import sys
 import logging
 import logging.config
 from optparse import OptionParser
+from sqlalchemy import engine_from_config
 
 from infocache.factory import DaemonFactory
+from infocache.db import init_model
+import infocache.utils.config_parser as config_parser
 
 
 class Infocache(object):
@@ -66,6 +69,14 @@ class Infocache(object):
             pid = os.fork()
             if pid > 0: #  parent takes next daemon
                 continue
+            # initialize db session for each daemon 'separately'
+            try:
+                engine = engine_from_config(config_parser.config.get(),'sqlalchemy_infocache.')
+                init_model(engine)
+                self.log.info("Session object to local/remote database created")
+            except Exception, ex:
+                self.log.error("Session object to local/remote database failed: %r", ex)
+
             daemon.change_state(self.command)
 
 if __name__ == "__main__":
