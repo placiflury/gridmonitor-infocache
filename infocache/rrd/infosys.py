@@ -46,55 +46,96 @@ class GrisGiis(object):
             self.log.info("Created RDD database '%s'" % dbname)
         
 
-    def _make_cmd(self, fig_name, start, end, cluster_name, _type, rrd_file):
-        cmd = "rrdtool graph %s -s %d -e %d --title='%s processing times for %s' \
-                 DEF:proc=%s:processing_time:AVERAGE \
-                 VDEF:proc_max=proc,MAXIMUM \
-                 VDEF:proc_avg=proc,AVERAGE \
-                 VDEF:proc_min=proc,MINIMUM \
-                 -c BACK#F8F7FF \
-                 -c CANVAS#4682B4 \
-                 -c SHADEA#F0EDFF \
-                 -c SHADEB#E9E4FF \
-                 -c GRID#CCFFFF \
-                 -c MGRID#FFFFC0 \
-                 -c ARROW#000000 \
-                 -c FONT#000000 \
-                 -h 80  \
-                 -v \[sec\] \
-                 GPRINT:proc_min:'MIN\:'%%2.1lf%%Ss\
-                 GPRINT:proc_avg:'AVG\:'%%2.1lf%%Ss\
-                 GPRINT:proc_max:'MAX\:'%%2.1lf%%Ss\
-                 AREA:proc#CCFFFF:'Processing Time'" % \
-                    (fig_name, start, end, _type, cluster_name, rrd_file)
+    def _make_cmd(self, fig_name, start, end, cluster_name, _type, rrd_file, _kind = 'processing'):
+        if _kind == 'processing':
+            cmd = "rrdtool graph %s -s %d -e %d --title='%s processing times for %s' \
+                     DEF:proc=%s:processing_time:AVERAGE \
+                     VDEF:proc_max=proc,MAXIMUM \
+                     VDEF:proc_avg=proc,AVERAGE \
+                     VDEF:proc_min=proc,MINIMUM \
+                     -c BACK#F8F7FF \
+                     -c CANVAS#4682B4 \
+                     -c SHADEA#F0EDFF \
+                     -c SHADEB#E9E4FF \
+                     -c GRID#CCFFFF \
+                     -c MGRID#FFFFC0 \
+                     -c ARROW#000000 \
+                     -c FONT#000000 \
+                     -h 80  \
+                     -v \[sec\] \
+                     GPRINT:proc_min:'MIN\:'%%2.1lf%%Ss\
+                     GPRINT:proc_avg:'AVG\:'%%2.1lf%%Ss\
+                     GPRINT:proc_max:'MAX\:'%%2.1lf%%Ss\
+                     AREA:proc#CCFFFF:'Processing Time'" % \
+                        (fig_name, start, end, _type, cluster_name, rrd_file)
+        else:
+             cmd = "rrdtool graph %s -s %d -e %d --title='%s response times for %s' \
+                     DEF:resp=%s:response_time:AVERAGE \
+                     VDEF:resp_max=resp,MAXIMUM \
+                     VDEF:resp_avg=resp,AVERAGE \
+                     VDEF:resp_min=resp,MINIMUM \
+                     -c BACK#F8F7FF \
+                     -c CANVAS#4682B4 \
+                     -c SHADEA#F0EDFF \
+                     -c SHADEB#E9E4FF \
+                     -c GRID#CCFFFF \
+                     -c MGRID#FFFFC0 \
+                     -c ARROW#000000 \
+                     -c FONT#000000 \
+                     -h 80  \
+                     -v \[sec\] \
+                     GPRINT:resp_min:'MIN\:'%%2.1lf%%Ss\
+                     GPRINT:resp_avg:'AVG\:'%%2.1lf%%Ss\
+                     GPRINT:resp_max:'MAX\:'%%2.1lf%%Ss\
+                     AREA:resp#CCFFFF:'Processing Time'" % \
+                        (fig_name, start, end, _type, cluster_name, rrd_file)
         return cmd
 
     def create_plots(self, cluster_name, _type='GRIS'):
         
         rrd_file = os.path.join(self.rrddir, cluster_name+'.rrd')
-        fig24_name = os.path.join(self.plotdir, cluster_name+'_h24.png') # 24hours plot
+
+        fig24_name_r = os.path.join(self.plotdir, cluster_name+'_h24r.png') # 24hours plot (response times)
+        fig24_name_p = os.path.join(self.plotdir, cluster_name+'_h24p.png') # 24hours plot (processing times)
         h24_e = time.time()
         h24_s = h24_e - 24 * 3600
 
-        cmd = self._make_cmd(fig24_name, h24_s, h24_e, cluster_name, _type, rrd_file)
+        cmd = self._make_cmd(fig24_name_r, h24_s, h24_e, cluster_name, _type, rrd_file, 'response')
         (code, output) = commands.getstatusoutput(cmd)
         if code != 0:
             self.log.error( output)
         
-        figw1_name = os.path.join(self.plotdir, cluster_name+'_w1.png') # 1 week  plot
+        cmd = self._make_cmd(fig24_name_p, h24_s, h24_e, cluster_name, _type, rrd_file)
+        (code, output) = commands.getstatusoutput(cmd)
+        if code != 0:
+            self.log.error( output)
+        
+        figw1_name_r = os.path.join(self.plotdir, cluster_name+'_w1r.png') # 1 week  plot
+        figw1_name_p = os.path.join(self.plotdir, cluster_name+'_w1p.png') 
         hw1_e = time.time()
         hw1_s = hw1_e - 24 * 3600 * 7 
+        
+        cmd = self._make_cmd(figw1_name_r, hw1_s, hw1_e, cluster_name, _type, rrd_file, 'response')
+        (code, output) = commands.getstatusoutput(cmd)
+        if code != 0:
+            self.log.error( output)
 
-        cmd = self._make_cmd(figw1_name, hw1_s, hw1_e, cluster_name, _type, rrd_file)
+        cmd = self._make_cmd(figw1_name_p, hw1_s, hw1_e, cluster_name, _type, rrd_file)
         (code, output) = commands.getstatusoutput(cmd)
         if code != 0:
             self.log.error( output)
         
-        figy1_name = os.path.join(self.plotdir, cluster_name+'_y1.png') # 1 year  plot
+        figy1_name_r = os.path.join(self.plotdir, cluster_name+'_y1r.png') # 1 year  plot
+        figy1_name_p = os.path.join(self.plotdir, cluster_name+'_y1p.png')
         hy1_e = time.time()
         hy1_s = hy1_e - 24 * 3600 * 365
 
-        cmd = self._make_cmd(figy1_name, hy1_s, hy1_e, cluster_name, _type, rrd_file)
+        cmd = self._make_cmd(figy1_name_r, hy1_s, hy1_e, cluster_name, _type, rrd_file, 'response')
+        (code, output) = commands.getstatusoutput(cmd)
+        if code != 0:
+            self.log.error( output)
+        
+        cmd = self._make_cmd(figy1_name_p, hy1_s, hy1_e, cluster_name, _type, rrd_file)
         (code, output) = commands.getstatusoutput(cmd)
         if code != 0:
             self.log.error( output)
