@@ -59,7 +59,7 @@ t_cluster = sa.Table("cluster",meta.metadata,
         sa.Column('session_dir',sa.types.VARCHAR(255)),
         sa.Column('cache',sa.types.VARCHAR(255)),
         sa.Column('benchmarks',sa.types.VARCHAR(255)),
-        sa.Column('runtime_environments',sa.types.TEXT)
+        sa.Column('runtime_environments',sa.types.TEXT(262144))
 )
 
 t_queue = sa.Table('queue', meta.metadata,

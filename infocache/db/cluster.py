@@ -120,7 +120,7 @@ class NGCluster(ClusterApi, ClusterMeta):
         session_dir =  255, 
         cache = 255, 
         benchmarks = 255,
-        runtime_environments = 65535)
+        runtime_environments = 262141)
     
     # list of attributes which are stored pickled
     PICKLED = ['support', 'owners', 'middlewares', 
