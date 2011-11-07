@@ -159,7 +159,8 @@ class GrisGiis(object):
                 self.create_rrd(dbn) 
 
             cm = cluster.get_metadata()
-
+            if cm.get_status() != 'active':
+                continue
             response_time = cm.get_response_time()
             processing_time = cm.get_processing_time()
 

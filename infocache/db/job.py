@@ -20,7 +20,7 @@ class NGJob(object, JobApi):
         completion_time = None,
         cpu_count = None,
         sessiondir_erase_time = None,
-        errors = 1023,
+        errors = 2048,
         execution_nodes = 1023,
         exit_code = None,
         gmlog = 511,

@@ -1,3 +1,2 @@
 - documentation
 - add arclib to pythonpath without using the sys.path.append hack as used currently
-- don't update rrd-plots of inactive/blaclisted clusters
