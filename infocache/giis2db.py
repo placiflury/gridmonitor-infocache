@@ -71,8 +71,9 @@ class Giis2db(Daemon):
 
     def _populate_giis_list(self, giislist):
         """
-        Populates/completes recursively list of GIISes given 
-        a higher level giislist of type [(host,port,mds_vo_name), ...]
+        Populates/completes recursively list of GIISes, starting from given 
+        giislist of type [(host,port,mds_vo_name), ...], which should
+        contain higher order GIISes.
         """
         for host, port, mds_vo_name in giislist:
             if self.giis_blacklisted.has_key(host): 
@@ -86,13 +87,14 @@ class Giis2db(Daemon):
                 self.giis_response[host] = time.time() - timestamp 
                 self.giis_list.append((host, port, mds_vo_name))
                 self._populate_giis_list(ng.get_giis_list())
-                ng.close()
             except GIISError:
                 self.log.warn("GIIS %s %s (mds_vo_name=%s) not accessible" % (host, port, mds_vo_name))
                 self.giis_blacklisted[host] = Giis2db.BLACK_LIST_COUNTER / Giis2db.GIIS_REFRESH_PERIOD
             except Exception, e:
                 self.log.info("Got exception %r", e)
                 self.giis_blacklisted[host] = Giis2db.BLACK_LIST_COUNTER / Giis2db.GIIS_REFRESH_PERIOD
+            finally:
+                ng.close()
             
     def _refresh_giis_list(self):
         """ refreshes GIIS servers list"""
@@ -108,7 +110,8 @@ class Giis2db(Daemon):
             giis = schema.GiisMeta(g_host, g_port, g_mds_vo_name)
             giis.set_response_time(self.giis_response[g_host])
             session.merge(giis)
-        
+      
+        _tmpl = list() 
         for g_host in self.giis_blacklisted.keys():
             self.log.debug("Blacklisted: %s" % g_host)
             giis = session.query(schema.GiisMeta).filter_by(hostname = g_host).first()
@@ -118,7 +121,12 @@ class Giis2db(Daemon):
                 giis.set_db_lastmodified()
                 session.add(giis)
             else:
+                _tmpl.append(g_host) # clean up later
                 self.log.debug("Did not exist in DB.... skipping")
+
+        for g_host in _tmpl:
+            self.giis_blacklisted.pop(g_host)
+
 
         for giis in session.query(schema.GiisMeta).filter(schema.GiisMeta.db_lastmodified <  timestamp):
             giis.set_status('inactive')
@@ -130,44 +138,44 @@ class Giis2db(Daemon):
     def _refresh_gris_list(self):
         """ Repopulates list of GRIS'es """
 
-        session = meta.Session()
-
-        self.gris_list = list()
-        for g_host, g_port, g_mds_vo_name  in self.giis_list:
-            db_giis = session.query(schema.GiisMeta).filter_by(hostname = g_host).first()
-            self.log.debug("Updating GRIS'es announced by '%s'" % db_giis.hostname) 
-            timestamp = time.time()
-            giis_url = arclib.URL(('ldap://%s:%s/o=grid/mds-vo-name=%s') % \
-                (g_host, g_port, g_mds_vo_name))
+        if not self.giis_list:
+            self.log.warn("No GIISes around, falling back to 'old' GRIS'es list") 
+        else:
+            self.gris_list = list()
             
-            gris_urls = arclib.GetClusterResources(giis_url)
-            proc_time = time.time() - timestamp
-            self.log.debug("Query of GIIS for GRIS URLs took %s seconds" % proc_time)
-            db_giis.set_processing_time(proc_time)
-            db_giis.set_db_lastmodified()
-            session.add(db_giis)
-            for gris_url in  gris_urls:
-                if gris_url not in self.gris_list:
-                    self.gris_list.append(gris_url)
-        session.commit()
+            session = meta.Session()
+            for g_host, g_port, g_mds_vo_name  in self.giis_list:
+                db_giis = session.query(schema.GiisMeta).filter_by(hostname = g_host).first()
+                self.log.debug("Updating GRIS'es announced by '%s'" % db_giis.hostname) 
+                timestamp = time.time()
+                giis_url = arclib.URL(('ldap://%s:%s/o=grid/mds-vo-name=%s') % \
+                    (g_host, g_port, g_mds_vo_name))
+                
+                gris_urls = arclib.GetClusterResources(giis_url)
+                proc_time = time.time() - timestamp
+                self.log.debug("Query of GIIS for GRIS URLs took %s seconds" % proc_time)
+                db_giis.set_processing_time(proc_time)
+                db_giis.set_db_lastmodified()
+                session.add(db_giis)
+                for gris_url in  gris_urls:
+                    if gris_url not in self.gris_list:
+                        self.gris_list.append(gris_url)
+            session.commit()
 
     def run(self):
         self.gris2db.start() 
         cycle = 1
         while True:
             try:
-                self.log.info("New cycle run.")
+                self.log.info("New 'caching' cycle run.")
                 cycle -= 1
                 timestamp = time.time()
-                if cycle <= 1:
+                if not self.giis_list or cycle <= 1: 
                     cycle = Giis2db.GIIS_REFRESH_PERIOD
                     self._refresh_giis_list() 
-                self.log.debug("Using GIIS list")
                 self._refresh_gris_list()            
-                self.log.debug("GRIS list refreshed")
                 self.gris2db.add_urls2queue(self.gris_list)
                 self.log.debug("Refreshed GRISes list")
-                
                 proctime = time.time() - timestamp
                 self.log.info("Current run took  %s seconds" % proctime)
 
