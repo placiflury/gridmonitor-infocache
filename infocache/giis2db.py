@@ -94,7 +94,8 @@ class Giis2db(Daemon):
                 self.log.info("Got exception %r", e)
                 self.giis_blacklisted[host] = Giis2db.BLACK_LIST_COUNTER / Giis2db.GIIS_REFRESH_PERIOD
             finally:
-                ng.close()
+                if ng:
+                    ng.close()
             
     def _refresh_giis_list(self):
         """ refreshes GIIS servers list"""
