@@ -53,6 +53,7 @@ class NGGiis(LDAPCommon):
 
         try:
             self.ldap = ldap.initialize(host)
+	    self.ldap.set_option(ldap.OPT_TIMEOUT, 10.0)
             self.ldap.simple_bind_s()
         except ldap.SERVER_DOWN:
             self.log.warn("GIIS server %s is down." % host)
@@ -132,8 +133,9 @@ if __name__ == "__main__":
     _mds_vo_name = "NorduGrid, o=grid"
     logging.config.fileConfig("/opt/smscg/infocache/etc/logging.conf")
     try:
-        ng = NGGiis("index1.nordugrid.org:2135", mds_vo_name = _mds_vo_name)
-        ng = NGGiis("grid.uio.no:2135", mds_vo_name='Norway')
+        ng = NGGiis("giis.smscg.ch:2135", mds_vo_name='Switzerland')
+        #ng = NGGiis("idgc3grid06.uzh.ch:2135", mds_vo_name='Switzerland')
+	print 'yo'
         cnames =  ng.get_giis_list()
         for giis in cnames:
             print giis

@@ -83,10 +83,12 @@ class Giis2db(Daemon):
                 continue
             try:
                 timestamp = time.time()
+		self.log.debug("Populating giis list... (%s) " % host )
                 ng = NGGiis(host, mds_vo_name = mds_vo_name)
                 self.giis_response[host] = time.time() - timestamp 
                 self.giis_list.append((host, port, mds_vo_name))
                 self._populate_giis_list(ng.get_giis_list())
+		self.log.debug("Populating giis of list done.")
             except GIISError:
                 self.log.warn("GIIS %s %s (mds_vo_name=%s) not accessible" % (host, port, mds_vo_name))
                 self.giis_blacklisted[host] = Giis2db.BLACK_LIST_COUNTER / Giis2db.GIIS_REFRESH_PERIOD
