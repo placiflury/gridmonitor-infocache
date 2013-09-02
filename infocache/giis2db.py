@@ -39,8 +39,8 @@ class Giis2db(Daemon):
                                 
 
     def __init__(self, pidfile="/var/run/giis2db.pid", **kwargs):
-        self.log = logging.getLogger(__name__)
         Daemon.__init__(self, pidfile)
+        self.log = logging.getLogger(__name__)
         self.periodicity = kwargs['periodicity']
         self.top_giis_list = kwargs['top_giis_list']
         self.mds_vo_name = kwargs['mds_vo_name']
@@ -58,16 +58,16 @@ class Giis2db(Daemon):
         """ Changing daemon state. """
         if state == 'start':
             self.log.info("starting daemon...")
-            Daemon.start(self)
+            self.start()
         elif state == 'stop':
             self.log.info("stopping daemon...")
             self.gris2db.stop()
-            Daemon.stop(self)
+            self.stop()
             self.log.info("stopped")
         elif state == 'restart':
             self.log.info("restarting daemon...")
             self.gris2db.stop()
-            Daemon.restart(self)
+            self.restart()
 
     def _populate_giis_list(self, giislist):
         """
@@ -180,12 +180,13 @@ class Giis2db(Daemon):
                 self.gris2db.add_urls2queue(self.gris_list)
                 self.log.debug("Refreshed GRISes list")
                 proctime = time.time() - timestamp
-                self.log.info("Current run took  %s seconds" % proctime)
+                self.log.info("Giis2db took %s seconds", proctime)
 
-                if proctime > self.periodicity:
-                    continue
-                else:
-                    time.sleep(self.periodicity - proctime)
+                sleeptime = self.periodicity - proctime
+                self.log.debug("run: sleeptime: %s", sleeptime)
+                if sleeptime > 0:
+                    time.sleep(sleeptime)
 
             except Exception, e:
                 self.log.error("RUN-loop: Got exception %r", e)
+                time.sleep(self.periodicity)

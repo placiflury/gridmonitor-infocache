@@ -25,29 +25,31 @@ class Housekeeper(Daemon):
     RRD_PERIODICITY = 120  # RRD plot resolution (Hardcoded)
 
     def __init__(self, pidfile="/var/run/housekeeper.pid", **kwargs):
-        self.log = logging.getLogger(__name__)
         Daemon.__init__(self, pidfile)
+        self.log = logging.getLogger(__name__)
         rrd_dir = kwargs['rrd_dir']
         plot_dir = kwargs['plot_dir']
+
 
         self.rrd = RRD(rrd_dir, plot_dir)
         self.cleaner = Cleanex() 
 
-        self.log.debug("Initialization finished")
+        self.log.debug('init: rrd_dir: %s', rrd_dir)
+        self.log.debug('init: plot_dir: %s', plot_dir)
 
 
     def change_state(self, state):
         """ Changing daemon state. """
         if state == 'start':
             self.log.info("starting daemon...")
-            Daemon.start(self)
+            self.start()
         elif state == 'stop':
             self.log.info("stopping daemon...")
-            Daemon.stop(self)
+            self.stop()
             self.log.info("stopped")
         elif state == 'restart':
             self.log.info("restarting daemon...")
-            Daemon.restart(self)
+            self.restart()
 
     def run(self):
         while True:
@@ -57,11 +59,12 @@ class Housekeeper(Daemon):
                 self.cleaner.main()
                 
                 proctime = time.time() - timestamp
-                self.log.debug("Housekeeper current run took  %s seconds" % proctime)
-                if proctime > Housekeeper.RRD_PERIODICITY:
-                    continue
-                else:
-                    time.sleep(Housekeeper.RRD_PERIODICITY - proctime)
+                self.log.info("Housekeeper took %s seconds", proctime)
+
+		sleeptime = Housekeeper.RRD_PERIODICITY - proctime
+                self.log.debug("run: sleeptime: %s", sleeptime)
+                if sleeptime > 0:
+                    time.sleep(sleeptime)
 
             except Exception, e:
                 self.log.error("RUN-loop: Got exception %r", e)

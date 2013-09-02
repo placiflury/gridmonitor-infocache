@@ -6,7 +6,7 @@ from distutils.core import setup
 
 setup(
     name = "smscg_infocacher",
-    version = "1.1.0",
+    version = "1.1.1",
     description = "Database (MySQL) caching engine for ARC Information system data.",
     long_description = """
 	This module provides a daemon that queries the top-level NorduGrid ARC 

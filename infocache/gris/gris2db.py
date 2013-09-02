@@ -25,8 +25,8 @@ from arclib import GetClusterJobs
 from infocache.db import meta, schema
 from infocache.db.cluster import ClusterMeta
 from infocache.errors.db import Input_Error
-from statistics import NGStats
-from access import ClusterAccess
+from infocache.gris.statistics import NGStats
+from infocache.gris.access import ClusterAccess
 
 class Gris2db(object):
     
@@ -115,7 +115,7 @@ class Gris2db(object):
                 elif db_job.status in Gris2db.JOB_FIN_STATES: # case: final db state -> don't touch
                     continue
                 elif job.status == 'DELETED': 
-                    if db_job.status in ['FINISHED','KILLED','FAILED']:
+                    if db_job.status in ['FINISHED', 'KILLED', 'FAILED']:
                         if (db_job.sessiondir_erase_time >= datetime.utcfromtimestamp(0)) and \
                             (db_job.sessiondir_erase_time <= datetime.utcnow()): # not feched
                             suffix = '_DELETED'
@@ -218,7 +218,11 @@ class Gris2db(object):
         """
         
         while not self.stop_threads:
-            gris_url, insert_time = self.processing_q.get(True) # blocking
+            try:
+                gris_url, insert_time = self.processing_q.get(True, 30) # blocking
+            except Queue.Empty:
+                continue
+
             # start doing job
             self.log.debug("Current queueing time: %s seconds" % (time.time() - insert_time))
             self._cache_cluster_info(gris_url)
