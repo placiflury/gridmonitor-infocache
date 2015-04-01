@@ -1,0 +1,2 @@
+This module provides a daemon that queries the top-level [NorduGrid](http://en.wikipedia.org/wiki/NorduGrid) ARC GIIS(es). From the GIIS it fetches the list of information system front-ends(GRIS'es), which get queried in 2 minutes intervals (configurable).
+The information about cluster and queue status, as well as about user jobs etc. is then stored in a local database (like MySQL). The daemon can further be run to create rrd plots (and DBs) on GIIS and GRIS response and processing times and on the jobs (#number of jobs, queue backlogs etc.).
